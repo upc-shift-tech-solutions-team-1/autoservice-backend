@@ -4,7 +4,7 @@ WORKDIR /src
 COPY AutoServiceAW.sln ./
 COPY AutoServiceAW.API/AutoServiceAW.API.csproj ./AutoServiceAW.API/
 
-RUN dotnet restore AutoServiceAW.sln
+RUN dotnet restore AutoServiceAW.API/AutoServiceAW.API.csproj
 
 COPY . .
 WORKDIR /src/AutoServiceAW.API
