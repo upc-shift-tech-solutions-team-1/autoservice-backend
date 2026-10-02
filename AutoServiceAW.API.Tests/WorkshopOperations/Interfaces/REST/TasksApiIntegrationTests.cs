@@ -2,9 +2,13 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
+using AutoServiceAW.API.InventoryManagement.Application.Internal;
+using AutoServiceAW.API.InventoryManagement.Domain.Model.Aggregates;
+using AutoServiceAW.API.InventoryManagement.Domain.Repositories;
 using AutoServiceAW.API.InventoryManagement.Domain.Services;
 using AutoServiceAW.API.Shared.Domain.Repositories;
 using AutoServiceAW.API.WorkshopOperations.Application.Internal;
+using TaskPart = AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.TaskPart;
 using AutoServiceAW.API.WorkshopOperations.Domain.Repositories;
 using AutoServiceAW.API.WorkshopOperations.Domain.Services;
 using AutoServiceAW.API.WorkshopOperations.Interfaces.REST;
@@ -22,7 +26,7 @@ using WorkshopTask =
 namespace AutoServiceAW.API.Tests.WorkshopOperations.Interfaces.REST;
 
 [TestClass]
-public class TasksIntegrationTests
+public class TasksApiIntegrationTests
 {
     /// <summary>
     /// Verifies that posting a valid task request returns HTTP 201, persists
@@ -124,6 +128,124 @@ public class TasksIntegrationTests
         unitOfWorkMock.Verify(
             unitOfWork => unitOfWork.CompleteAsync(),
             Times.Once
+        );
+    }
+
+    /// <summary>
+    /// Verifies that starting an approved task consumes the allocated stock
+    /// through the Inventory Management application service.
+    /// </summary>
+    [TestMethod]
+    public async Task StartApprovedTask_WithAllocatedParts_ShouldConsumeInventoryStock()
+    {
+        // Arrange
+        const int inventoryItemId = 0;
+        const int allocatedQuantity = 3;
+        var inventoryItem = new InventoryItem(
+            "Brake pad",
+            "SPARE_PART",
+            "Acme",
+            80m,
+            10,
+            1,
+            string.Empty,
+            50m
+        );
+        var task = new WorkshopTask(
+            12,
+            34,
+            "Replace brake pads",
+            "PENDING",
+            "HIGH",
+            90,
+            250m
+        );
+        task.AddPart(new TaskPart(5, inventoryItemId, "Brake pad", allocatedQuantity, 80m, 50m));
+        task.PatchTechnicalData(
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            "APPROVED"
+        );
+
+        var inventoryRepositoryMock = new Mock<IInventoryItemRepository>();
+        inventoryRepositoryMock
+            .Setup(repository => repository.FindByIdAsync(
+                inventoryItemId,
+                It.IsAny<CancellationToken>()
+            ))
+            .ReturnsAsync(inventoryItem);
+
+        var taskRepositoryMock = new Mock<ITaskRepository>();
+        taskRepositoryMock
+            .Setup(repository => repository.FindByIdWithPartsAsync(5))
+            .ReturnsAsync(task);
+
+        var unitOfWorkMock = new Mock<IUnitOfWork>();
+        unitOfWorkMock
+            .Setup(unitOfWork => unitOfWork.CompleteAsync())
+            .Returns(Task.CompletedTask);
+
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services
+            .AddControllers()
+            .AddApplicationPart(typeof(TasksController).Assembly);
+        builder.Services.AddSingleton<ITaskRepository>(taskRepositoryMock.Object);
+        builder.Services.AddSingleton<IInventoryItemRepository>(inventoryRepositoryMock.Object);
+        builder.Services.AddSingleton<IUnitOfWork>(unitOfWorkMock.Object);
+        builder.Services.AddScoped<ITaskService, TaskService>();
+        builder.Services.AddScoped<IInventoryItemService, InventoryItemService>();
+        builder.Services.AddSingleton<IWorkOrderService>(
+            new Mock<IWorkOrderService>().Object
+        );
+        builder.Services
+            .AddAuthentication("Test")
+            .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                "Test",
+                _ => { }
+            );
+        builder.Services.AddAuthorization();
+
+        await using var app = builder.Build();
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.MapControllers();
+        await app.StartAsync();
+
+        var client = app.GetTestClient();
+        var request = new PatchTaskResource(
+            "IN_PROGRESS",
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        // Act
+        var response = await client.PatchAsJsonAsync(
+            "/api/v1/tasks/5",
+            request
+        );
+
+        // Assert
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.AreEqual(10 - allocatedQuantity, inventoryItem.Stock);
+        Assert.AreEqual("IN_PROGRESS", task.Status);
+        inventoryRepositoryMock.Verify(
+            repository => repository.Update(inventoryItem),
+            Times.Once
+        );
+        taskRepositoryMock.Verify(
+            repository => repository.Update(task),
+            Times.Once
+        );
+        unitOfWorkMock.Verify(
+            unitOfWork => unitOfWork.CompleteAsync(),
+            Times.Exactly(2)
         );
     }
 }
