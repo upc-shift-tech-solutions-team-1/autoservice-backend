@@ -37,7 +37,8 @@ using Microsoft.OpenApi.Models;
 
 /// <summary>
 /// The main entry point configuration file for the Web Application.
-/// Sets up the dependency injection container, authentication infrastructure middleware, multi-tenant database context connections, and HTTP pipelines.
+/// Sets up the dependency injection container, authentication infrastructure middleware,
+/// multi-tenant database context connections, and HTTP pipelines.
 /// </summary>
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,12 +50,10 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
 });
 
-// Configure minimal API and controller descriptive route explorer mechanisms.
+// Configure API endpoint explorer.
 builder.Services.AddEndpointsApiExplorer();
-/*builder.Services.AddSwaggerGen(options =>
-{
-    options.EnableAnnotations();
-});*/
+
+// Configure Swagger documentation and JWT authentication support.
 builder.Services.AddSwaggerGen(options =>
 {
     options.EnableAnnotations();
@@ -85,23 +84,28 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Enforce uniform lower-case formatting policies on all REST endpoint routes and URL structures.
-builder.Services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
+// Enforce uniform lower-case formatting policies on REST routes.
+builder.Services.Configure<RouteOptions>(
+    options => options.LowercaseUrls = true
+);
 
 #endregion
 
 #region Database Connection Configuration
 
-// Extract the relational primary database connection string setting sequence.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// Extract the relational primary database connection string.
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (connectionString != null)
+    {
         options.UseMySql(
             connectionString,
             ServerVersion.AutoDetect(connectionString)
         );
+    }
 });
 
 #endregion
@@ -145,11 +149,13 @@ builder.Services.AddScoped<IWorkshopService, WorkshopService>();
 
 #region Security and Authentication Infrastructure
 
-// Extract JWT token validation configurations properties.
+// Extract JWT token validation configuration properties.
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.ASCII.GetBytes(jwtSettings["Secret"]!);
 
-builder.Services.AddAuthentication(options =>
+// Configure JWT authentication.
+builder.Services
+    .AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme =
             JwtBearerDefaults.AuthenticationScheme;
@@ -166,20 +172,28 @@ builder.Services.AddAuthentication(options =>
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
+
                 ValidIssuer = jwtSettings["Issuer"],
                 ValidAudience = jwtSettings["Audience"],
+
                 IssuerSigningKey =
                     new SymmetricSecurityKey(key)
             };
     });
 
-// Configure open cross-origin sharing policies to authorize client UI system components integrations.
+// Register authorization services so controllers can use
+// [Authorize] and role-based authorization.
+builder.Services.AddAuthorization();
+// Register health check services for application monitoring.
+builder.Services.AddHealthChecks();
+// Configure cross-origin sharing policies for client applications.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(
         "AllowAll",
         policy =>
-            policy.AllowAnyOrigin()
+            policy
+                .AllowAnyOrigin()
                 .AllowAnyMethod()
                 .AllowAnyHeader()
     );
@@ -191,20 +205,31 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Enable Swagger API testing documentation panels under development environment contexts boundaries.
+// Enable Swagger API documentation.
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
-
-// Inject security routing filters, CORS evaluations, and request authentications checkpoints to the active pipeline execution flow.
+if (!app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
+// Configure CORS before authentication/authorization.
 app.UseCors("AllowAll");
+
+// Validate JWT credentials.
 app.UseAuthentication();
+
+// Enforce authorization rules such as [Authorize]
+// and [Authorize(Roles = "...")].
 app.UseAuthorization();
 
-// Expose mapping routes matching operational controller boundaries.
+// Map controller routes.
 app.MapControllers();
+// Expose a health check endpoint for application monitoring.
+app.MapHealthChecks("/health");
 
+// Map controller routes.
+app.MapControllers();
 /*
  * Database migrations are executed only when explicitly enabled
  * through the Database:ApplyMigrationsOnStartup configuration.
@@ -245,7 +270,7 @@ if (applyMigrationsOnStartup)
     }
 }
 
-// Execute the async background web runner container.
+// Execute the web application.
 app.Run();
 
 #endregion
