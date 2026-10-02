@@ -10,9 +10,14 @@ namespace AutoServiceAW.API.Tests.WorkshopOperations.Application.Internal;
 [TestClass]
 public class TaskServiceTests
 {
+    /// <summary>
+    /// Verifies that creating a task persists it through the repository,
+    /// completes the unit of work, and returns the created instance.
+    /// </summary>
     [TestMethod]
     public async Task CreateAsync_WithValidTask_ShouldPersistTaskAndCompleteUnitOfWork()
     {
+        // Arrange
         var taskRepositoryMock = new Mock<ITaskRepository>();
         var unitOfWorkMock = new Mock<IUnitOfWork>();
         var taskService = new TaskService(
@@ -40,8 +45,10 @@ public class TaskServiceTests
             .Setup(unitOfWork => unitOfWork.CompleteAsync())
             .Returns(Task.CompletedTask);
 
+        // Act
         var result = await taskService.CreateAsync(task);
 
+        // Assert
         Assert.AreSame(task, result);
         taskRepositoryMock.Verify(
             repository => repository.AddAsync(
@@ -56,9 +63,14 @@ public class TaskServiceTests
         );
     }
 
+    /// <summary>
+    /// Verifies that patching a task's technical data updates the task,
+    /// persists the changes, and completes the unit of work.
+    /// </summary>
     [TestMethod]
     public async Task PatchStatusAsync_WithTechnicalUpdates_ShouldUpdateTaskAndPersistChanges()
     {
+        // Arrange
         var taskRepositoryMock = new Mock<ITaskRepository>();
         var unitOfWorkMock = new Mock<IUnitOfWork>();
         var taskService = new TaskService(
@@ -82,6 +94,7 @@ public class TaskServiceTests
             .Setup(unitOfWork => unitOfWork.CompleteAsync())
             .Returns(Task.CompletedTask);
 
+        // Act
         var result = await taskService.PatchStatusAsync(
             5,
             "IN_PROGRESS",
@@ -92,6 +105,7 @@ public class TaskServiceTests
             "APPROVED"
         );
 
+        // Assert
         Assert.AreSame(existingTask, result);
         Assert.AreEqual("IN_PROGRESS", existingTask.Status);
         Assert.AreEqual("Brake pads are worn", existingTask.TechnicalDiagnosis);

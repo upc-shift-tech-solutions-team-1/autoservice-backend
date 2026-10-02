@@ -24,9 +24,14 @@ namespace AutoServiceAW.API.Tests.WorkshopOperations.Interfaces.REST;
 [TestClass]
 public class TasksIntegrationTests
 {
+    /// <summary>
+    /// Verifies that posting a valid task request returns HTTP 201, persists
+    /// the task with the expected values, and completes the unit of work.
+    /// </summary>
     [TestMethod]
     public async Task CreateTask_WithValidRequest_ShouldReturnCreatedTaskAndPersistIt()
     {
+        // Arrange
         WorkshopTask? persistedTask = null;
         var taskRepositoryMock = new Mock<ITaskRepository>();
         var unitOfWorkMock = new Mock<IUnitOfWork>();
@@ -88,11 +93,13 @@ public class TasksIntegrationTests
             null
         );
 
+        // Act
         var response = await client.PostAsJsonAsync(
             "/api/v1/tasks",
             request
         );
 
+        // Assert
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
         Assert.IsNotNull(persistedTask);
         Assert.AreEqual(12, persistedTask.WorkOrderId);
