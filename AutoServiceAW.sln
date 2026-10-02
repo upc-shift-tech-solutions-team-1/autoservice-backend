@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoServiceAW.API", "AutoSe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoServiceAW.API.Tests", "AutoServiceAW.API.Tests\AutoServiceAW.API.Tests.csproj", "{6DE64CC8-60B7-433E-B3B8-5BA9A03BD761}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoServiceAW.Tests", "AutoServiceAW.Tests\AutoServiceAW.Tests.csproj", "{8AE18F77-C333-4F23-8776-7C74DFB5E500}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +40,18 @@ Global
 		{6DE64CC8-60B7-433E-B3B8-5BA9A03BD761}.Release|x64.Build.0 = Release|Any CPU
 		{6DE64CC8-60B7-433E-B3B8-5BA9A03BD761}.Release|x86.ActiveCfg = Release|Any CPU
 		{6DE64CC8-60B7-433E-B3B8-5BA9A03BD761}.Release|x86.Build.0 = Release|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Debug|x64.Build.0 = Debug|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Debug|x86.Build.0 = Debug|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Release|x64.ActiveCfg = Release|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Release|x64.Build.0 = Release|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Release|x86.ActiveCfg = Release|Any CPU
+		{8AE18F77-C333-4F23-8776-7C74DFB5E500}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -317,4 +317,207 @@ public class AuthenticationAcceptanceTests
             persistedUser.WorkshopId
         );
     }
+    [TestMethod]
+public async Task Mechanic_WithValidToken_ShouldNotAccessAdminSignUpEndpoint()
+{
+    // ARRANGE
+    var mechanicEmail = "mechanic@autoservice.com";
+    var mechanicPassword = "MechanicPassword123";
+    var workshopId = "WS-1";
+
+    var passwordHash =
+        BCrypt.Net.BCrypt.HashPassword(mechanicPassword);
+
+    var mechanicUser = new User(
+        mechanicEmail,
+        passwordHash,
+        "mechanic",
+        workshopId
+    );
+
+    var userRepositoryMock =
+        new Mock<IUserRepository>();
+
+    var unitOfWorkMock =
+        new Mock<IUnitOfWork>();
+
+    var workshopServiceMock =
+        new Mock<IWorkshopService>();
+
+    var mechanicRepositoryMock =
+        new Mock<IMechanicRepository>();
+
+    userRepositoryMock
+        .Setup(repository =>
+            repository.FindByEmailAsync(mechanicEmail)
+        )
+        .ReturnsAsync(mechanicUser);
+
+    var builder =
+        WebApplication.CreateBuilder();
+
+    builder.WebHost.UseTestServer();
+
+    builder.Configuration["Jwt:Secret"] =
+        "AutoServiceTestSecretKey12345678901234567890";
+
+    builder.Configuration["Jwt:Issuer"] =
+        "AutoServiceTest";
+
+    builder.Configuration["Jwt:Audience"] =
+        "AutoServiceTestUsers";
+
+    builder.Configuration["Jwt:ExpirationInMinutes"] =
+        "60";
+
+    builder.Services
+        .AddControllers()
+        .AddApplicationPart(
+            typeof(AuthController).Assembly
+        );
+
+    builder.Services.AddSingleton<IUserRepository>(
+        userRepositoryMock.Object
+    );
+
+    builder.Services.AddSingleton<IUnitOfWork>(
+        unitOfWorkMock.Object
+    );
+
+    builder.Services.AddSingleton<IWorkshopService>(
+        workshopServiceMock.Object
+    );
+
+    builder.Services.AddSingleton<IMechanicRepository>(
+        mechanicRepositoryMock.Object
+    );
+
+    builder.Services.AddScoped<
+        IAuthService,
+        AuthService
+    >();
+
+    var jwtSecret =
+        builder.Configuration["Jwt:Secret"]!;
+
+    var jwtKey =
+        Encoding.ASCII.GetBytes(
+            jwtSecret
+        );
+
+    builder.Services
+        .AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme =
+                JwtBearerDefaults.AuthenticationScheme;
+
+            options.DefaultChallengeScheme =
+                JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters =
+                new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+
+                    ValidIssuer =
+                        "AutoServiceTest",
+
+                    ValidAudience =
+                        "AutoServiceTestUsers",
+
+                    IssuerSigningKey =
+                        new SymmetricSecurityKey(
+                            jwtKey
+                        )
+                };
+        });
+
+    builder.Services.AddAuthorization();
+
+    await using var app =
+        builder.Build();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    await app.StartAsync();
+
+    var client =
+        app.GetTestClient();
+
+    // ACT - STEP 1: LOGIN AS MECHANIC
+    var loginResponse =
+        await client.PostAsJsonAsync(
+            "/api/v1/auth/sign-in",
+            new SignInResource(
+                mechanicEmail,
+                mechanicPassword
+            )
+        );
+
+    Assert.AreEqual(
+        HttpStatusCode.OK,
+        loginResponse.StatusCode
+    );
+
+    var loginJson =
+        await loginResponse.Content
+            .ReadFromJsonAsync<JsonElement>();
+
+    var token =
+        loginJson
+            .GetProperty("token")
+            .GetString();
+
+    Assert.IsFalse(
+        string.IsNullOrWhiteSpace(token)
+    );
+
+    Assert.AreEqual(
+        "mechanic",
+        loginJson
+            .GetProperty("role")
+            .GetString()
+    );
+
+    // ACT - STEP 2: TRY TO ACCESS ADMIN-ONLY ENDPOINT
+    client.DefaultRequestHeaders.Authorization =
+        new AuthenticationHeaderValue(
+            "Bearer",
+            token
+        );
+
+    var response =
+        await client.PostAsJsonAsync(
+            "/api/v1/auth/sign-up",
+            new SignUpResource(
+                "anothermechanic@autoservice.com",
+                "AnotherPassword123",
+                "mechanic",
+                workshopId
+            )
+        );
+
+    // ASSERT
+    Assert.AreEqual(
+        HttpStatusCode.Forbidden,
+        response.StatusCode
+    );
+
+    userRepositoryMock.Verify(
+        repository =>
+            repository.AddAsync(
+                It.IsAny<User>(),
+                It.IsAny<CancellationToken>()
+            ),
+        Times.Never
+    );
+}
 }

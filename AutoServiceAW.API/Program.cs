@@ -184,7 +184,8 @@ builder.Services
 // Register authorization services so controllers can use
 // [Authorize] and role-based authorization.
 builder.Services.AddAuthorization();
-
+// Register health check services for application monitoring.
+builder.Services.AddHealthChecks();
 // Configure cross-origin sharing policies for client applications.
 builder.Services.AddCors(options =>
 {
@@ -208,8 +209,10 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
-
+if (!app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
 // Configure CORS before authentication/authorization.
 app.UseCors("AllowAll");
 
@@ -222,7 +225,11 @@ app.UseAuthorization();
 
 // Map controller routes.
 app.MapControllers();
+// Expose a health check endpoint for application monitoring.
+app.MapHealthChecks("/health");
 
+// Map controller routes.
+app.MapControllers();
 /*
  * Database migrations are executed only when explicitly enabled
  * through the Database:ApplyMigrationsOnStartup configuration.
