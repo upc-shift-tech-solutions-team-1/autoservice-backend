@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
 namespace AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates;
 
 /// <summary>
@@ -87,6 +90,9 @@ public class WorkOrder
     /// </summary>
     public bool FinalTestDone { get; private set; }
 
+    [JsonIgnore]
+    public ICollection<WorkOrderStatusHistory> StatusHistory { get; private set; } = new List<WorkOrderStatusHistory>();
+
     #endregion
 
     #region Constructors
@@ -113,6 +119,7 @@ public class WorkOrder
         Status = "PENDING"; 
         TrackingCode = $"WO-{Guid.NewGuid().ToString().Substring(0, 6).ToUpper()}";
         StartDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        StatusHistory.Add(new WorkOrderStatusHistory(Status, DateTime.UtcNow));
     }
 
     /// <summary>
@@ -169,9 +176,10 @@ public class WorkOrder
     /// <param name="status">The incoming state target progress indicator identifier string evaluation criteria.</param>
     public void UpdateStatus(string status)
     {
-        if (!string.IsNullOrEmpty(status))
+        if (!string.IsNullOrWhiteSpace(status) && Status != status)
         {
             Status = status;
+            StatusHistory.Add(new WorkOrderStatusHistory(status, DateTime.UtcNow));
         }
     }
 

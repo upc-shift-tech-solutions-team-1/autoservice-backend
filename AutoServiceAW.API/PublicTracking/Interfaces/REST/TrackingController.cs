@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AutoServiceAW.API.WorkshopOperations.Domain.Services;
+using AutoServiceAW.API.PublicTracking.Application.Internal;
 using AutoServiceAW.API.CustomerManagement.Domain.Services;
 using AutoServiceAW.API.FleetManagement.Domain.Services;
 using AutoServiceAW.API.TenantManagement.Domain.Repositories;
@@ -37,12 +38,34 @@ namespace AutoServiceAW.API.PublicTracking.Interfaces.REST
         [HttpGet("workorders")]
         public async Task<IActionResult> GetOrderByCode([FromQuery] string trackingCode)
         {
-            var orders = await _workOrderService.ListAsync();
-            var order = orders.FirstOrDefault(o => o.TrackingCode == trackingCode);
+            if (string.IsNullOrWhiteSpace(trackingCode)) return BadRequest();
+
+            var order = await _workOrderService.GetByTrackingCodeAsync(trackingCode);
 
             if (order == null) return NotFound();
             
-            return Ok(new[] { order });
+            var publicOrder = new TrackingWorkOrderResource(
+                order.TrackingCode,
+                order.Status,
+                order.EstimatedDate,
+                order.VehicleId,
+                order.CustomerId,
+                order.WorkshopId
+            );
+
+            return Ok(new[] { publicOrder });
+        }
+
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetSummaryByCode([FromQuery] string trackingCode)
+        {
+            if (string.IsNullOrWhiteSpace(trackingCode)) return BadRequest();
+
+            var order = await _workOrderService.GetByTrackingCodeAsync(trackingCode);
+            if (order == null) return NotFound();
+
+            var tasks = await _taskService.ListByWorkOrderIdAsync(order.Id);
+            return Ok(TrackingSummaryFactory.Create(order, tasks));
         }
 
         [HttpGet("vehicles/{id}")]
@@ -52,13 +75,6 @@ namespace AutoServiceAW.API.PublicTracking.Interfaces.REST
             if (vehicle == null) return NotFound();
             
             return Ok(vehicle);
-        }
-
-        [HttpGet("tasks")]
-        public async Task<IActionResult> GetTasksByOrder([FromQuery] int workOrderId)
-        {
-            var tasks = await _taskService.ListByWorkOrderIdAsync(workOrderId);
-            return Ok(tasks);
         }
 
         [HttpGet("customers/{id}")]
