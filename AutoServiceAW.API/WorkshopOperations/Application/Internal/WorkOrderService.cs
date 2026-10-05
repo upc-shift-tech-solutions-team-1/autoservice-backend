@@ -44,6 +44,9 @@ public class WorkOrderService(IWorkOrderRepository workOrderRepository, IUnitOfW
     /// <returns>A task that represents the asynchronous operation. The task result contains the found <see cref="WorkOrder"/>, or <see langword="null"/>.</returns>
     public async System.Threading.Tasks.Task<WorkOrder?> GetByIdAsync(int id) => await workOrderRepository.FindByIdAsync(id);
 
+    public async System.Threading.Tasks.Task<WorkOrder?> GetByTrackingCodeAsync(string trackingCode) =>
+        await workOrderRepository.FindByTrackingCodeWithHistoryAsync(trackingCode);
+
     /// <summary>
     /// Synchronizes structural core descriptions, date milestones, billing metrics, checklists, and state progress conditions asynchronously.
     /// </summary>
@@ -52,7 +55,7 @@ public class WorkOrderService(IWorkOrderRepository workOrderRepository, IUnitOfW
     /// <returns>A task that represents the asynchronous operation. The task result contains the modified and persisted <see cref="WorkOrder"/> aggregate.</returns>
     public async System.Threading.Tasks.Task<WorkOrder?> UpdateAsync(int id, WorkOrder updatedWorkOrder)
     {
-        var existingWorkOrder = await workOrderRepository.FindByIdAsync(id);
+        var existingWorkOrder = await workOrderRepository.FindByIdWithHistoryAsync(id);
         if (existingWorkOrder == null) return null;
 
         existingWorkOrder.Update(updatedWorkOrder.Description, updatedWorkOrder.EstimatedDate, updatedWorkOrder.Price);

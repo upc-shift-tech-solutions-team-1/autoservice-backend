@@ -483,6 +483,38 @@ namespace AutoServiceAW.API.Migrations
                     b.ToTable("task_parts", (string)null);
                 });
 
+            modelBuilder.Entity("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.WorkOrderStatusHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("changed_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("int")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_work_order_status_history");
+
+                    b.HasIndex("WorkOrderId")
+                        .HasDatabaseName("ix_work_order_status_history_work_order_id");
+
+                    b.ToTable("work_order_status_history", (string)null);
+                });
+
             modelBuilder.Entity("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.WorkOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -598,6 +630,18 @@ namespace AutoServiceAW.API.Migrations
                         .HasConstraintName("fk_tasks_work_orders_work_order_id");
                 });
 
+            modelBuilder.Entity("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.WorkOrderStatusHistory", b =>
+                {
+                    b.HasOne("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.WorkOrder", "WorkOrder")
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_status_history_work_orders_work_order_id");
+
+                    b.Navigation("WorkOrder");
+                });
+
             modelBuilder.Entity("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.TaskPart", b =>
                 {
                     b.HasOne("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.Task", "Task")
@@ -613,6 +657,11 @@ namespace AutoServiceAW.API.Migrations
             modelBuilder.Entity("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.Task", b =>
                 {
                     b.Navigation("Parts");
+                });
+
+            modelBuilder.Entity("AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.WorkOrder", b =>
+                {
+                    b.Navigation("StatusHistory");
                 });
 #pragma warning restore 612, 618
         }
