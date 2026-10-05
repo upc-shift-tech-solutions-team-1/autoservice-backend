@@ -129,5 +129,18 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
         return result == null ? NotFound() : Ok(result);
     }
 
+    /// <summary>
+    /// Deletes a work order so the REST contract remains consistent with
+    /// the Web client and the application service.
+    /// </summary>
+    /// <param name="id">The identifier of the work order to delete.</param>
+    /// <returns>A 204 response when the operation completes.</returns>
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteWorkOrder(int id)
+    {
+        await workOrderService.DeleteAsync(id);
+        return NoContent();
+    }
+
     #endregion
 }
