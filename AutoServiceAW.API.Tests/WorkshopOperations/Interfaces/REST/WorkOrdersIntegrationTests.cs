@@ -44,16 +44,41 @@ public class WorkOrdersIntegrationTests
                 AuthenticationSchemeOptions,
                 TestAuthenticationHandler
             >("Test", _ => { });
+
         builder.Services.AddAuthorization();
+
         builder.Services
             .AddControllers()
             .AddApplicationPart(typeof(WorkOrdersController).Assembly);
+
         builder.Services.AddSingleton(service.Object);
 
         await using var app = builder.Build();
+
         app.UseAuthentication();
+
+        // Defines the authenticated workshop for this integration test.
+        app.Use(async (context, next) =>
+        {
+            context.User = new System.Security.Claims.ClaimsPrincipal(
+                new System.Security.Claims.ClaimsIdentity(
+                    new[]
+                    {
+                        new System.Security.Claims.Claim(
+                            "WorkshopId",
+                            "WS-01"
+                        )
+                    },
+                    "Test"
+                )
+            );
+
+            await next();
+        });
+
         app.UseAuthorization();
         app.MapControllers();
+
         await app.StartAsync();
 
         var client = app.GetTestClient();
@@ -79,7 +104,12 @@ public class WorkOrdersIntegrationTests
             HttpStatusCode.Created,
             createResponse.StatusCode
         );
-        Assert.AreEqual(HttpStatusCode.OK, listResponse.StatusCode);
+
+        Assert.AreEqual(
+            HttpStatusCode.OK,
+            listResponse.StatusCode
+        );
+
         Assert.IsNotNull(storedOrder);
         Assert.AreEqual("WS-01", storedOrder.WorkshopId);
 
@@ -88,6 +118,7 @@ public class WorkOrdersIntegrationTests
 
         Assert.AreEqual(JsonValueKind.Array, json.ValueKind);
         Assert.AreEqual(1, json.GetArrayLength());
+
         Assert.AreEqual(
             "Brake noise reported by the customer",
             json[0].GetProperty("description").GetString()
