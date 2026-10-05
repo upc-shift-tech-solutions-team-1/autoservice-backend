@@ -105,7 +105,7 @@ public class WorkshopOperationsServiceTests
         var unitOfWork = new Mock<IUnitOfWork>();
 
         repository
-            .Setup(value => value.FindByIdAsync(41, default))
+            .Setup(value => value.FindByIdWithHistoryAsync(41))
             .ReturnsAsync(existingOrder);
 
         unitOfWork
