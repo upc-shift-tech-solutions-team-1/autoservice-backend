@@ -24,5 +24,15 @@ public class WorkOrderRepository(AppDbContext context) : BaseRepository<WorkOrde
         return await Context.WorkOrders.Where(w => w.WorkshopId == workshopId).ToListAsync();
     }
 
+    public Task<WorkOrder?> FindByTrackingCodeWithHistoryAsync(string trackingCode) =>
+        Context.WorkOrders
+            .Include(workOrder => workOrder.StatusHistory)
+            .FirstOrDefaultAsync(workOrder => workOrder.TrackingCode == trackingCode);
+
+    public Task<WorkOrder?> FindByIdWithHistoryAsync(int id) =>
+        Context.WorkOrders
+            .Include(workOrder => workOrder.StatusHistory)
+            .FirstOrDefaultAsync(workOrder => workOrder.Id == id);
+
     #endregion
 }

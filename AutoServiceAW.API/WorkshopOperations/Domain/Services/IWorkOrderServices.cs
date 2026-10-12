@@ -36,6 +36,9 @@ public interface IWorkOrderService
     /// <returns>A task that represents the asynchronous operation. The task result contains the matching asset data instance envelope model, or null.</returns>
     System.Threading.Tasks.Task<WorkOrder?> GetByIdAsync(int id);
 
+    /// <summary>Retrieves an order by its public tracking code, including real status-change history.</summary>
+    System.Threading.Tasks.Task<WorkOrder?> GetByTrackingCodeAsync(string trackingCode);
+
     /// <summary>
     /// Coordinates complete synchronization transformations over baseline descriptions, milestones, checklists, and macro states.
     /// </summary>

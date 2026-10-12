@@ -43,6 +43,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     /// </summary>
     public DbSet<WorkOrder> WorkOrders { get; set; }
 
+    /// <summary>Gets the persisted status changes for workshop work orders.</summary>
+    public DbSet<WorkOrderStatusHistory> WorkOrderStatusHistory { get; set; }
+
     /// <summary>
     /// Gets or sets the database persistence tracking mapping context for assigned diagnostic tasks.
     /// </summary>
@@ -151,6 +154,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         builder.Entity<WorkOrder>().Property(w => w.DiagnosisValidated).HasDefaultValue(false);
         builder.Entity<WorkOrder>().Property(w => w.CleaningDone).HasDefaultValue(false);
         builder.Entity<WorkOrder>().Property(w => w.FinalTestDone).HasDefaultValue(false);
+
+        // Work order status history mapping
+        builder.Entity<WorkOrderStatusHistory>().ToTable("WorkOrderStatusHistory");
+        builder.Entity<WorkOrderStatusHistory>().HasKey(history => history.Id);
+        builder.Entity<WorkOrderStatusHistory>().Property(history => history.Id).IsRequired().ValueGeneratedOnAdd();
+        builder.Entity<WorkOrderStatusHistory>().Property(history => history.Status).IsRequired().HasMaxLength(30);
+        builder.Entity<WorkOrderStatusHistory>().Property(history => history.ChangedAtUtc).IsRequired().HasColumnType("datetime(6)");
+        builder.Entity<WorkOrderStatusHistory>()
+            .HasOne(history => history.WorkOrder)
+            .WithMany(workOrder => workOrder.StatusHistory)
+            .HasForeignKey(history => history.WorkOrderId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         // Task mapping
         builder.Entity<Task>().ToTable("Tasks");
