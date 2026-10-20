@@ -7,6 +7,7 @@ using AutoServiceAW.API.InventoryManagement.Domain.Model.Aggregates;
 using AutoServiceAW.API.InventoryManagement.Domain.Repositories;
 using AutoServiceAW.API.InventoryManagement.Domain.Services;
 using AutoServiceAW.API.Shared.Domain.Repositories;
+using AutoServiceAW.API.StaffCoordination.Domain.Repositories;
 using AutoServiceAW.API.WorkshopOperations.Application.Internal;
 using TaskPart = AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.TaskPart;
 using AutoServiceAW.API.WorkshopOperations.Domain.Repositories;
@@ -24,6 +25,8 @@ using WorkshopTask =
     AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.Task;
 
 namespace AutoServiceAW.API.Tests.WorkshopOperations.Interfaces.REST;
+
+
 
 [TestClass]
 public class TasksApiIntegrationTests
@@ -54,6 +57,22 @@ public class TasksApiIntegrationTests
             .Setup(unitOfWork => unitOfWork.CompleteAsync())
             .Returns(Task.CompletedTask);
 
+        var workOrderServiceMock = new Mock<IWorkOrderService>();
+
+        var workOrder = new AutoServiceAW.API.WorkshopOperations
+            .Domain.Model.Aggregates.WorkOrder(
+                "WS-01",
+                15,
+                23,
+                34,
+                "Revisión de frenos",
+                "2026-10-20",
+                0m
+            );
+
+        workOrderServiceMock
+            .Setup(service => service.GetByIdAsync(12))
+            .ReturnsAsync(workOrder);
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services
@@ -68,8 +87,13 @@ public class TasksApiIntegrationTests
         builder.Services.AddSingleton<IInventoryItemService>(
             new Mock<IInventoryItemService>().Object
         );
+
         builder.Services.AddSingleton<IWorkOrderService>(
-            new Mock<IWorkOrderService>().Object
+            workOrderServiceMock.Object
+        );
+
+        builder.Services.AddSingleton<IMechanicRepository>(
+            new Mock<IMechanicRepository>().Object
         );
         builder.Services.AddScoped<ITaskService, TaskService>();
         builder.Services
@@ -188,6 +212,22 @@ public class TasksApiIntegrationTests
             .Setup(unitOfWork => unitOfWork.CompleteAsync())
             .Returns(Task.CompletedTask);
 
+        var workOrderServiceMock = new Mock<IWorkOrderService>();
+
+        var workOrder = new AutoServiceAW.API.WorkshopOperations
+            .Domain.Model.Aggregates.WorkOrder(
+                "WS-01",
+                15,
+                23,
+                34,
+                "Revisión de frenos",
+                "2026-10-20",
+                0m
+            );
+
+        workOrderServiceMock
+            .Setup(service => service.GetByIdAsync(12))
+            .ReturnsAsync(workOrder);
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services
@@ -199,7 +239,10 @@ public class TasksApiIntegrationTests
         builder.Services.AddScoped<ITaskService, TaskService>();
         builder.Services.AddScoped<IInventoryItemService, InventoryItemService>();
         builder.Services.AddSingleton<IWorkOrderService>(
-            new Mock<IWorkOrderService>().Object
+            workOrderServiceMock.Object
+        );
+        builder.Services.AddSingleton<IMechanicRepository>(
+            new Mock<IMechanicRepository>().Object
         );
         builder.Services
             .AddAuthentication("Test")
@@ -263,7 +306,12 @@ internal sealed class TestAuthenticationHandler(
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var identity = new ClaimsIdentity(
-            [new Claim(ClaimTypes.Name, "test-user")],
+            new[]
+            {
+                new Claim(ClaimTypes.Name, "test-user"),
+                new Claim(ClaimTypes.Role, "admin"),
+                new Claim("WorkshopId", "WS-01")
+            },
             Scheme.Name
         );
         var principal = new ClaimsPrincipal(identity);

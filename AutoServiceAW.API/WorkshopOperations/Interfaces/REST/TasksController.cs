@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WorkshopTask =
     AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.Task;
+using AutoServiceAW.API.StaffCoordination.Domain.Repositories;
+using System.Security.Claims;
+
 
 namespace AutoServiceAW.API.WorkshopOperations.Interfaces.REST;
 
@@ -53,7 +56,8 @@ public record PatchTaskResource(
 public class TasksController(
     ITaskService taskService,
     IWorkOrderService workOrderService,
-    IInventoryItemService inventoryItemService
+    IInventoryItemService inventoryItemService,
+    IMechanicRepository mechanicRepository
 ) : ControllerBase
 {
     private const string PendingStatus = "PENDING";
@@ -65,6 +69,52 @@ public class TasksController(
         [FromBody] CreateTaskResource resource
     )
     {
+        var workshopId = User.FindFirst("WorkshopId")?.Value;
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        var workOrder =
+            await workOrderService.GetByIdAsync(resource.WorkOrderId);
+
+        if (workOrder == null || workOrder.WorkshopId != workshopId)
+        {
+            return NotFound();
+        }
+        if (User.IsInRole("mechanic"))
+        {
+            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Unauthorized();
+            }
+
+            var mechanic = await mechanicRepository.FindByEmailAsync(email);
+
+            if (mechanic == null || mechanic.WorkshopId != workshopId)
+            {
+                return Forbid();
+            }
+
+            if (resource.MechanicId != mechanic.Id)
+            {
+                return Forbid();
+            }
+
+            if (resource.LaborPrice != 0 || resource.LaborCost != 0)
+            {
+                return BadRequest(
+                    new { message = "Los importes deben ser definidos por el administrador." }
+                );
+            }
+        }
+        else if (!User.IsInRole("admin"))
+        {
+            return Forbid();
+        }
         var requestedParts =
             resource.Parts ?? [];
 
@@ -162,13 +212,13 @@ public class TasksController(
 
         task.PatchTechnicalData(
             string.Empty,
-            resource.TechnicalDiagnosis ??
+            resource.TechnicalDiagnosis ?? string.Empty,
             string.Empty,
             string.Empty,
             string.Empty,
-            string.Empty,
-            resource.AdminReviewStatus ??
-            string.Empty
+            User.IsInRole("admin")
+                ? resource.AdminReviewStatus ?? string.Empty
+                : "SUBMITTED"
         );
 
         var result =
@@ -200,63 +250,108 @@ public class TasksController(
             return Unauthorized();
         }
 
+        var workshopOrders =
+            await workOrderService.ListByTenantIdAsync(workshopId);
+
+        var workshopOrderIds = workshopOrders
+            .Select(order => order.Id)
+            .ToHashSet();
+
+        int? authenticatedMechanicId = null;
+
+        if (User.IsInRole("mechanic"))
+        {
+            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Unauthorized();
+            }
+
+            var mechanic = await mechanicRepository.FindByEmailAsync(email);
+
+            if (mechanic == null || mechanic.WorkshopId != workshopId)
+            {
+                return Forbid();
+            }
+
+            authenticatedMechanicId = mechanic.Id;
+        }
+        else if (!User.IsInRole("admin"))
+        {
+            return Forbid();
+        }
         IEnumerable<WorkshopTask> tasks;
 
         if (workOrderId.HasValue)
         {
-            tasks =
-                await taskService
-                    .ListByWorkOrderIdAsync(
-                        workOrderId.Value
-                    );
+            if (!workshopOrderIds.Contains(workOrderId.Value))
+            {
+                return NotFound();
+            }
+
+            tasks = await taskService.ListByWorkOrderIdAsync(
+                workOrderId.Value
+            );
         }
         else if (mechanicId.HasValue)
         {
-            tasks =
-                await taskService
-                    .ListByMechanicIdAsync(
-                        mechanicId.Value
-                    );
+            var mechanicTasks =
+                await taskService.ListByMechanicIdAsync(
+                    mechanicId.Value
+                );
+
+            tasks = mechanicTasks.Where(
+                task => workshopOrderIds.Contains(task.WorkOrderId)
+            );
         }
         else
         {
-            var allTasks =
-                await taskService.ListAsync();
-
-            var workOrders =
-                await workOrderService.ListAsync();
-
-            var workshopOrderIds =
-                workOrders
-                    .Where(
-                        workOrder =>
-                            workOrder.WorkshopId ==
-                            workshopId
-                    )
-                    .Select(
-                        workOrder =>
-                            workOrder.Id
-                    )
-                    .ToHashSet();
+            var allTasks = await taskService.ListAsync();
 
             tasks = allTasks.Where(
-                task =>
-                    workshopOrderIds.Contains(
-                        task.WorkOrderId
-                    )
+                task => workshopOrderIds.Contains(task.WorkOrderId)
             );
         }
-
+        if (authenticatedMechanicId.HasValue)
+        {
+            tasks = tasks.Where(
+                task => task.MechanicId == authenticatedMechanicId.Value
+            );
+        }
         return Ok(tasks);
     }
 
-   [HttpPut("{id:int}")]
-public async Task<IActionResult> UpdateTask(
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> UpdateTask(
     int id,
     [FromBody] UpdateTaskResource resource
-)
-{
-    var task = new WorkshopTask(
+    )
+    {
+        var workshopId = User.FindFirst("WorkshopId")?.Value;
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        var existingTask = await taskService.GetByIdAsync(id);
+
+        if (existingTask == null)
+        {
+            return NotFound();
+        }
+
+        var workOrder = await workOrderService.GetByIdAsync(
+            existingTask.WorkOrderId
+        );
+
+        if (workOrder == null || workOrder.WorkshopId != workshopId)
+        {
+            return NotFound();
+        }
+        var task = new WorkshopTask(
         0,
         resource.MechanicId,
         resource.Description,
@@ -265,7 +360,7 @@ public async Task<IActionResult> UpdateTask(
         resource.EstimatedTime,
         resource.LaborPrice,
         resource.LaborCost
-    );
+        );
 
     var result =
         await taskService.UpdateAsync(
@@ -279,6 +374,7 @@ public async Task<IActionResult> UpdateTask(
     }
 
     if (
+        User.IsInRole("admin") &&
         !string.IsNullOrWhiteSpace(
             resource.AdminReviewStatus
         )
@@ -310,6 +406,50 @@ public async Task<IActionResult> UpdateTask(
         [FromBody] PatchTaskResource resource
     )
     {
+        var workshopId = User.FindFirst("WorkshopId")?.Value;
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        var existingTask = await taskService.GetByIdAsync(id);
+
+        if (existingTask == null)
+        {
+            return NotFound();
+        }
+
+        var workOrder = await workOrderService.GetByIdAsync(
+            existingTask.WorkOrderId
+        );
+
+        if (workOrder == null || workOrder.WorkshopId != workshopId)
+        {
+            return NotFound();
+        }
+        if (User.IsInRole("mechanic"))
+        {
+            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Unauthorized();
+            }
+
+            var mechanic = await mechanicRepository.FindByEmailAsync(email);
+
+            if (mechanic == null ||
+                mechanic.WorkshopId != workshopId ||
+                existingTask.MechanicId != mechanic.Id)
+            {
+                return Forbid();
+            }
+        }
+        else if (!User.IsInRole("admin"))
+        {
+            return Forbid();
+        }
         var requestedStatus =
             NormalizeCode(
                 resource.Status
@@ -393,8 +533,9 @@ public async Task<IActionResult> UpdateTask(
                 string.Empty,
                 resource.EvidenceRegistered ??
                 string.Empty,
-                resource.AdminReviewStatus ??
-                string.Empty
+                User.IsInRole("admin")
+                    ? resource.AdminReviewStatus ?? string.Empty
+                    : string.Empty
             );
 
         return result == null
@@ -403,10 +544,32 @@ public async Task<IActionResult> UpdateTask(
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteTask(
-        int id
-    )
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> DeleteTask(int id)
     {
+        var workshopId = User.FindFirst("WorkshopId")?.Value;
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        var existingTask = await taskService.GetByIdAsync(id);
+
+        if (existingTask == null)
+        {
+            return NotFound();
+        }
+
+        var workOrder = await workOrderService.GetByIdAsync(
+            existingTask.WorkOrderId
+        );
+
+        if (workOrder == null || workOrder.WorkshopId != workshopId)
+        {
+            return NotFound();
+        }
+
         await taskService.DeleteAsync(id);
 
         return NoContent();

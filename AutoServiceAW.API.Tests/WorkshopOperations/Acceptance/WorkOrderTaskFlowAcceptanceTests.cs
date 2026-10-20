@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using WorkshopTask = AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.Task;
+using AutoServiceAW.API.StaffCoordination.Domain.Repositories;
 
 namespace AutoServiceAW.API.Tests.WorkshopOperations.Acceptance;
 
@@ -41,7 +42,16 @@ public class WorkOrderTaskFlowAcceptanceTests
                 (order, _) => storedOrder = order
             )
             .Returns(System.Threading.Tasks.Task.CompletedTask);
-
+        workOrderRepository
+            .Setup(value => value.FindByIdAsync(0))
+            .ReturnsAsync(() => storedOrder);
+        workOrderRepository
+            .Setup(value => value.FindByWorkshopIdAsync("WS-01"))
+            .ReturnsAsync(() =>
+                storedOrder == null
+                    ? Array.Empty<WorkOrder>()
+                    : new[] { storedOrder }
+            );
         taskRepository
             .Setup(value => value.AddAsync(
                 It.IsAny<WorkshopTask>(),
@@ -86,6 +96,11 @@ public class WorkOrderTaskFlowAcceptanceTests
         builder.Services.AddSingleton(taskRepository.Object);
         builder.Services.AddSingleton(unitOfWork.Object);
         builder.Services.AddSingleton(inventoryService.Object);
+
+        builder.Services.AddSingleton<IMechanicRepository>(
+            new Mock<IMechanicRepository>().Object
+        );
+
         builder.Services.AddScoped<IWorkOrderService, WorkOrderService>();
         builder.Services.AddScoped<ITaskService, TaskService>();
 
