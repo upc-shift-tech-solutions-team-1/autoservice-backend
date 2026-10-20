@@ -2,6 +2,7 @@ using AutoServiceAW.API.InventoryManagement.Domain.Model.Aggregates;
 using AutoServiceAW.API.InventoryManagement.Domain.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AutoServiceAW.API.IAM.Domain.Model.ValueObjects;
 
 namespace AutoServiceAW.API.InventoryManagement.Interfaces.REST;
 
@@ -66,6 +67,7 @@ public class InventoryItemsController(
     /// Stock must later be increased through a provider receipt.
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = UserRole.Admin)]
     public async Task<IActionResult> CreateInventoryItem(
         [FromBody] CreateInventoryItemResource resource
     )
@@ -133,6 +135,7 @@ public class InventoryItemsController(
     /// while preserving the current physical stock.
     /// </summary>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = UserRole.Admin)]
     public async Task<IActionResult> UpdateInventoryItem(
         int id,
         [FromBody] CreateInventoryItemResource resource
@@ -188,6 +191,7 @@ public class InventoryItemsController(
     /// The receipt result and updated inventory item.
     /// </returns>
     [HttpPost("{id:int}/receipts")]
+    [Authorize(Roles = UserRole.Admin)]
     public async Task<IActionResult> ReceiveInventoryStock(
         int id,
         [FromBody] ReceiveInventoryStockResource resource
@@ -304,6 +308,7 @@ public class InventoryItemsController(
     /// Deletes an inventory catalog item.
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = UserRole.Admin)]
     public async Task<IActionResult> DeleteInventoryItem(
         int id
     )
