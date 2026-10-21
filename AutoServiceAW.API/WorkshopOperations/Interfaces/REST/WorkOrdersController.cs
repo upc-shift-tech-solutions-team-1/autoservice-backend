@@ -50,17 +50,17 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
         try
         {
             var tenantId = User.Claims.FirstOrDefault(c => c.Type == "WorkshopId")?.Value ?? string.Empty;
-            
+
             var workOrder = new WorkOrder(
-                tenantId, 
-                resource.VehicleId, 
-                resource.CustomerId, 
+                tenantId,
+                resource.VehicleId,
+                resource.CustomerId,
                 resource.MechanicId,
-                resource.Description, 
-                resource.EstimatedDate, 
-                0 
+                resource.Description,
+                resource.EstimatedDate,
+                0
             );
-            
+
             var result = await workOrderService.CreateAsync(workOrder);
             return StatusCode(201, result);
         }
@@ -88,7 +88,7 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
     /// </summary>
     /// <param name="id">The unique lookup primary index row code tracking sequence key target parameters.</param>
     /// <returns>An <see cref="IActionResult"/> with 200 OK containing the data details folder mapping payload, or 404 Not Found.</returns>
-    
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetWorkOrder(int id)
     {
@@ -118,7 +118,7 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
     /// <param name="id">The target tracking primary index database row reference key index code sequence.</param>
     /// <param name="resource">The validation layout model carrier transporting incoming property metrics states configuration data.</param>
     /// <returns>An <see cref="IActionResult"/> with 200 OK tracking the edited context results, or 404 Not Found status.</returns>
-    
+
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateWorkOrder(
         int id,
@@ -164,10 +164,13 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
         updatedOrder.UpdateStatus(resource.Status);
 
         // Persistir los cambios autorizados.
+
         var result = await workOrderService.UpdateAsync(
             id,
+            tenantId,
             updatedOrder
         );
+
 
         return result == null ? NotFound() : Ok(result);
     }
@@ -179,7 +182,7 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
     /// </summary>
     /// <param name="id">The identifier of the work order to delete.</param>
     /// <returns>A 204 response when the operation completes.</returns>
-   
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteWorkOrder(int id)
     {
@@ -202,7 +205,7 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
         }
 
         // Eliminar únicamente órdenes del taller autorizado.
-        await workOrderService.DeleteAsync(id);
+        await workOrderService.DeleteAsync(id, tenantId);
 
         return NoContent();
     }

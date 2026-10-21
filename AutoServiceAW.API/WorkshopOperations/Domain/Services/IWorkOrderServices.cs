@@ -45,14 +45,21 @@ public interface IWorkOrderService
     /// <param name="id">The targeted lookup tracking identifier index parameters to match and alter.</param>
     /// <param name="workOrder">The temporary instance layout container carrying modification parameter updates.</param>
     /// <returns>A task that represents the asynchronous operation. The task result contains the updated entity tracking state result structure.</returns>
-    System.Threading.Tasks.Task<WorkOrder?> UpdateAsync(int id, WorkOrder workOrder);
+    System.Threading.Tasks.Task<WorkOrder?> UpdateAsync(
+        int id,
+        string authenticatedWorkshopId,
+        WorkOrder workOrder
+    );
 
     /// <summary>
     /// Coordinates complete removal workflows erasing a vehicle tracking work order record completely from persistence registers.
     /// </summary>
     /// <param name="id">The system service folder identification index reference criteria to wipe.</param>
     /// <returns>A task that represents the asynchronous operation handling promise resolution blocks.</returns>
-    System.Threading.Tasks.Task DeleteAsync(int id);
+    System.Threading.Tasks.Task DeleteAsync(
+        int id,
+        string authenticatedWorkshopId
+    );
 
     #endregion
 }

@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates;
 using AutoServiceAW.API.WorkshopOperations.Domain.Services;
 using AutoServiceAW.API.WorkshopOperations.Interfaces.REST;
@@ -62,7 +62,7 @@ public class WorkOrdersAuthorizationTests
             "Un usuario no debe consultar órdenes de otro taller."
         );
     }
-    
+
     [TestMethod]
     public async System.Threading.Tasks.Task
         UpdateWorkOrder_FromAnotherWorkshop_ShouldReturnNotFoundWithoutSaving()
@@ -125,6 +125,7 @@ public class WorkOrdersAuthorizationTests
         serviceMock.Verify(
             service => service.UpdateAsync(
                 It.IsAny<int>(),
+                It.IsAny<string>(),
                 It.IsAny<WorkOrder>()),
             Times.Never
         );
@@ -133,7 +134,7 @@ public class WorkOrdersAuthorizationTests
         Assert.AreEqual("PENDING", foreignOrder.Status);
         Assert.AreEqual(500m, foreignOrder.Price);
     }
-    
+
     [TestMethod]
     public async System.Threading.Tasks.Task
         DeleteWorkOrder_FromAnotherWorkshop_ShouldReturnNotFoundWithoutDeleting()
@@ -182,11 +183,13 @@ public class WorkOrdersAuthorizationTests
         Assert.IsInstanceOfType<NotFoundResult>(result);
 
         serviceMock.Verify(
-            service => service.DeleteAsync(It.IsAny<int>()),
+            service => service.DeleteAsync(
+                It.IsAny<int>(),
+                It.IsAny<string>()),
             Times.Never
         );
     }
-    
+
     [TestMethod]
     public async System.Threading.Tasks.Task
         GetWorkOrder_FromOwnWorkshop_ShouldReturnOk()
@@ -242,7 +245,7 @@ public class WorkOrdersAuthorizationTests
         );
     }
 
-    
+
 [TestMethod]
 public async System.Threading.Tasks.Task
     UpdateWorkOrder_FromOwnWorkshop_ShouldCallServiceAndReturnOk()
@@ -259,11 +262,14 @@ public async System.Threading.Tasks.Task
         .Setup(service => service.GetByIdAsync(10))
         .ReturnsAsync(existingOrder);
 
+
     serviceMock
         .Setup(service => service.UpdateAsync(
             10,
+            "WS-01",
             It.IsAny<WorkOrder>()))
-        .ReturnsAsync((int _, WorkOrder updated) => updated);
+        .ReturnsAsync((int _, string _, WorkOrder updated) => updated);
+
 
     var controller = new WorkOrdersController(serviceMock.Object)
     {
@@ -306,14 +312,17 @@ public async System.Threading.Tasks.Task
     Assert.AreEqual(750m, updatedOrder.Price);
     Assert.AreEqual("IN_PROGRESS", updatedOrder.Status);
 
+
     serviceMock.Verify(
         service => service.UpdateAsync(
             10,
+            "WS-01",
             It.Is<WorkOrder>(order =>
                 order.WorkshopId == "WS-01" &&
                 order.Description == "Updated brake repair")),
         Times.Once
     );
+
 }
 
 [TestMethod]
@@ -369,7 +378,7 @@ public async System.Threading.Tasks.Task
     );
 
     serviceMock.Verify(
-        service => service.DeleteAsync(10),
+        service => service.DeleteAsync(10, "WS-01"),
         Times.Once
     );
 }
