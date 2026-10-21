@@ -88,13 +88,29 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
     /// </summary>
     /// <param name="id">The unique lookup primary index row code tracking sequence key target parameters.</param>
     /// <returns>An <see cref="IActionResult"/> with 200 OK containing the data details folder mapping payload, or 404 Not Found.</returns>
+    
     [HttpGet("{id}")]
     public async Task<IActionResult> GetWorkOrder(int id)
     {
+        var tenantId = User.FindFirst("WorkshopId")?.Value;
+
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return Unauthorized();
+
         var workOrder = await workOrderService.GetByIdAsync(id);
-        if (workOrder == null) return NotFound();
+
+        if (workOrder == null ||
+            !string.Equals(
+                workOrder.WorkshopId,
+                tenantId,
+                StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
         return Ok(workOrder);
     }
+
 
     /// <summary>
     /// Updates structural details description logs, commitment dates, billing total financial scales, progress milestones, and audit checking controls flags.
@@ -102,32 +118,60 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
     /// <param name="id">The target tracking primary index database row reference key index code sequence.</param>
     /// <param name="resource">The validation layout model carrier transporting incoming property metrics states configuration data.</param>
     /// <returns>An <see cref="IActionResult"/> with 200 OK tracking the edited context results, or 404 Not Found status.</returns>
+    
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateWorkOrder(int id, [FromBody] UpdateWorkOrderResource resource)
+    public async Task<IActionResult> UpdateWorkOrder(
+        int id,
+        [FromBody] UpdateWorkOrderResource resource)
     {
-        var workOrder = new WorkOrder(
-            string.Empty, 
-            0, 
-            0, 
-            0,
-            resource.Description, 
-            resource.EstimatedDate, 
+        // Arrange: obtener el taller del usuario autenticado.
+        var tenantId = User.FindFirst("WorkshopId")?.Value;
+
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return Unauthorized();
+
+        // Verificar que la orden exista y pertenezca al taller.
+        var existingOrder = await workOrderService.GetByIdAsync(id);
+
+        if (existingOrder == null ||
+            !string.Equals(
+                existingOrder.WorkshopId,
+                tenantId,
+                StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
+        // Preparar los cambios solamente después de autorizar.
+        var updatedOrder = new WorkOrder(
+            tenantId,
+            existingOrder.VehicleId,
+            existingOrder.CustomerId,
+            existingOrder.MechanicId,
+            resource.Description,
+            resource.EstimatedDate,
             resource.Price
         );
-        
-        workOrder.UpdateChecklist(
-            resource.TasksCompleted, 
-            resource.SparePartsChecked, 
-            resource.DiagnosisValidated, 
-            resource.CleaningDone, 
+
+        updatedOrder.UpdateChecklist(
+            resource.TasksCompleted,
+            resource.SparePartsChecked,
+            resource.DiagnosisValidated,
+            resource.CleaningDone,
             resource.FinalTestDone
         );
-        
-        workOrder.UpdateStatus(resource.Status);
 
-        var result = await workOrderService.UpdateAsync(id, workOrder);
+        updatedOrder.UpdateStatus(resource.Status);
+
+        // Persistir los cambios autorizados.
+        var result = await workOrderService.UpdateAsync(
+            id,
+            updatedOrder
+        );
+
         return result == null ? NotFound() : Ok(result);
     }
+
 
     /// <summary>
     /// Deletes a work order so the REST contract remains consistent with
@@ -135,10 +179,31 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
     /// </summary>
     /// <param name="id">The identifier of the work order to delete.</param>
     /// <returns>A 204 response when the operation completes.</returns>
+   
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteWorkOrder(int id)
     {
+        // Arrange: identificar el taller autenticado.
+        var tenantId = User.FindFirst("WorkshopId")?.Value;
+
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return Unauthorized();
+
+        // Verificar que la orden exista y pertenezca al taller.
+        var existingOrder = await workOrderService.GetByIdAsync(id);
+
+        if (existingOrder == null ||
+            !string.Equals(
+                existingOrder.WorkshopId,
+                tenantId,
+                StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
+        // Eliminar únicamente órdenes del taller autorizado.
         await workOrderService.DeleteAsync(id);
+
         return NoContent();
     }
 
