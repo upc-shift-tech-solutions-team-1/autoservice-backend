@@ -21,3 +21,4 @@ temp_interactive_push.bat
 
 **/TestResults/
 .gitignore
+**/*.feature.cs

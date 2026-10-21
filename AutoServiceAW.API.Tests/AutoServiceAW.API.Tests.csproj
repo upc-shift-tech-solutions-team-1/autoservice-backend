@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
     <PackageReference Include="Moq" Version="4.21.0" />
     <PackageReference Include="MSTest" Version="4.0.2" />
+    <PackageReference Include="Reqnroll.MSTest" Version="3.3.4" />
   </ItemGroup>
 
   <ItemGroup>
