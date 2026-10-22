@@ -18,5 +18,11 @@ public interface IWorkOrderRepository : IBaseRepository<WorkOrder>
     /// <returns>A task that represents the asynchronous operation. The task result contains an enumerable collection of matching <see cref="WorkOrder"/> aggregates.</returns>
     Task<IEnumerable<WorkOrder>> FindByWorkshopIdAsync(string workshopId);
 
+    /// <summary>Finds a work order by its public tracking code and loads its status history.</summary>
+    Task<WorkOrder?> FindByTrackingCodeWithHistoryAsync(string trackingCode);
+
+    /// <summary>Finds a work order by ID and loads its status history for status updates.</summary>
+    Task<WorkOrder?> FindByIdWithHistoryAsync(int id);
+
     #endregion
 }
