@@ -118,7 +118,11 @@ public class WorkshopOperationsServiceTests
         );
 
         // Act
-        var result = await service.UpdateAsync(41, requestedUpdate);
+        var result = await service.UpdateAsync(
+            41,
+            "WS-01",
+            requestedUpdate
+        );
 
         // Assert
         Assert.IsNotNull(result);
@@ -139,4 +143,247 @@ public class WorkshopOperationsServiceTests
             Times.Once
         );
     }
+
+    [TestMethod]
+    public async System.Threading.Tasks.Task
+        UpdateWorkOrder_FromAnotherWorkshop_ShouldNotPersistChanges()
+    {
+        // Arrange
+        var existingOrder = new WorkOrder(
+            "WS-02",
+            15,
+            23,
+            8,
+            "Original brake diagnosis",
+            "2026-10-25",
+            500m
+        );
+
+        var requestedUpdate = new WorkOrder(
+            "WS-01",
+            15,
+            23,
+            8,
+            "Unauthorized modification",
+            "2026-11-05",
+            900m
+        );
+
+        requestedUpdate.UpdateStatus("COMPLETED");
+
+        var repository = new Mock<IWorkOrderRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+
+        repository
+            .Setup(value => value.FindByIdWithHistoryAsync(41))
+            .ReturnsAsync(existingOrder);
+
+        var service = new WorkOrderService(
+            repository.Object,
+            unitOfWork.Object
+        );
+
+        // Act
+        var result = await service.UpdateAsync(
+            41,
+            "WS-01",
+            requestedUpdate
+        );
+
+        // Assert
+        Assert.IsNull(
+            result,
+            "No debe permitirse modificar órdenes de otro taller."
+        );
+
+        Assert.AreEqual(
+            "Original brake diagnosis",
+            existingOrder.Description
+        );
+
+        Assert.AreEqual(500m, existingOrder.Price);
+        Assert.AreEqual("PENDING", existingOrder.Status);
+
+        repository.Verify(
+            value => value.Update(It.IsAny<WorkOrder>()),
+            Times.Never
+        );
+
+        unitOfWork.Verify(
+            value => value.CompleteAsync(),
+            Times.Never
+        );
+    }
+
+    [TestMethod]
+    public async System.Threading.Tasks.Task
+        DeleteWorkOrder_FromAnotherWorkshop_ShouldNotDelete()
+    {
+        // Arrange
+        var existingOrder = new WorkOrder(
+            "WS-02",
+            15,
+            23,
+            8,
+            "Brake repair",
+            "2026-10-25",
+            500m
+        );
+
+        var repository = new Mock<IWorkOrderRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+
+        repository
+            .Setup(value => value.FindByIdAsync(41))
+            .ReturnsAsync(existingOrder);
+
+        var service = new WorkOrderService(
+            repository.Object,
+            unitOfWork.Object
+        );
+
+        // Act
+        await service.DeleteAsync(41, "WS-01");
+
+        // Assert
+        repository.Verify(
+            value => value.Remove(It.IsAny<WorkOrder>()),
+            Times.Never
+        );
+
+        unitOfWork.Verify(
+            value => value.CompleteAsync(),
+            Times.Never
+        );
+    }
+
+    [TestMethod]
+    public async System.Threading.Tasks.Task
+        DeleteWorkOrder_FromOwnWorkshop_ShouldPersistDeletion()
+    {
+        // Arrange
+        var existingOrder = new WorkOrder(
+            "WS-01",
+            15,
+            23,
+            8,
+            "Brake repair",
+            "2026-10-25",
+            500m
+        );
+
+        var repository = new Mock<IWorkOrderRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+
+        repository
+            .Setup(value => value.FindByIdAsync(41))
+            .ReturnsAsync(existingOrder);
+
+        unitOfWork
+            .Setup(value => value.CompleteAsync())
+            .Returns(System.Threading.Tasks.Task.CompletedTask);
+
+        var service = new WorkOrderService(
+            repository.Object,
+            unitOfWork.Object
+        );
+
+        // Act
+        await service.DeleteAsync(41, "WS-01");
+
+        // Assert
+        repository.Verify(
+            value => value.Remove(existingOrder),
+            Times.Once
+        );
+
+        unitOfWork.Verify(
+            value => value.CompleteAsync(),
+            Times.Once
+        );
+    }
+
+    [TestMethod]
+    public async System.Threading.Tasks.Task
+        DeleteWorkOrder_WithoutWorkshopId_ShouldNotDelete()
+    {
+        // Arrange
+        var repository = new Mock<IWorkOrderRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+
+        var service = new WorkOrderService(
+            repository.Object,
+            unitOfWork.Object
+        );
+
+        // Act
+        await service.DeleteAsync(41, string.Empty);
+
+        // Assert
+        repository.Verify(
+            value => value.FindByIdAsync(It.IsAny<int>()),
+            Times.Never
+        );
+
+        repository.Verify(
+            value => value.Remove(It.IsAny<WorkOrder>()),
+            Times.Never
+        );
+
+        unitOfWork.Verify(
+            value => value.CompleteAsync(),
+            Times.Never
+        );
+    }
+
+
+    [TestMethod]
+    public async System.Threading.Tasks.Task
+        UpdateWorkOrder_WithoutWorkshopId_ShouldNotPersistChanges()
+    {
+        // Arrange
+        var repository = new Mock<IWorkOrderRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+
+        var requestedUpdate = new WorkOrder(
+            "WS-01",
+            15,
+            23,
+            8,
+            "Unauthorized update",
+            "2026-11-05",
+            900m
+        );
+
+        var service = new WorkOrderService(
+            repository.Object,
+            unitOfWork.Object
+        );
+
+        // Act
+        var result = await service.UpdateAsync(
+            41,
+            string.Empty,
+            requestedUpdate
+        );
+
+        // Assert
+        Assert.IsNull(result);
+
+        repository.Verify(
+            value => value.FindByIdWithHistoryAsync(It.IsAny<int>()),
+            Times.Never
+        );
+
+        repository.Verify(
+            value => value.Update(It.IsAny<WorkOrder>()),
+            Times.Never
+        );
+
+        unitOfWork.Verify(
+            value => value.CompleteAsync(),
+            Times.Never
+        );
+    }
+
 }
