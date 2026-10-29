@@ -267,8 +267,9 @@ public async System.Threading.Tasks.Task
         .Setup(service => service.UpdateAsync(
             10,
             "WS-01",
-            It.IsAny<WorkOrder>()))
-        .ReturnsAsync((int _, string _, WorkOrder updated) => updated);
+            It.IsAny<WorkOrder>(),
+            It.IsAny<string?>()))
+        .ReturnsAsync((int _, string _, WorkOrder updated, string? _) => updated);
 
 
     var controller = new WorkOrdersController(serviceMock.Object)
@@ -296,7 +297,8 @@ public async System.Threading.Tasks.Task
         "2026-11-05",
         750m,
         "IN_PROGRESS",
-        true, false, true, false, false
+        true, false, true, false, false,
+        "Falta recibir un repuesto"
     );
 
     // Act
@@ -319,10 +321,47 @@ public async System.Threading.Tasks.Task
             "WS-01",
             It.Is<WorkOrder>(order =>
                 order.WorkshopId == "WS-01" &&
-                order.Description == "Updated brake repair")),
+                order.Description == "Updated brake repair"),
+            "Falta recibir un repuesto"),
         Times.Once
     );
 
+}
+
+[TestMethod]
+public async System.Threading.Tasks.Task
+    UpdateWorkOrder_DelayWithoutReason_ShouldReturnBadRequest()
+{
+    var serviceMock = new Mock<IWorkOrderService>();
+    var existingOrder = new WorkOrder(
+        "WS-01", 15, 23, 8, "Original diagnosis", "2026-10-25", 500m
+    );
+    serviceMock.Setup(service => service.GetByIdAsync(10)).ReturnsAsync(existingOrder);
+
+    var controller = new WorkOrdersController(serviceMock.Object)
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    new[] { new Claim("WorkshopId", "WS-01") }, "Test"))
+            }
+        }
+    };
+    var request = new UpdateWorkOrderResource(
+        "Updated diagnosis", "2026-11-05", 500m, "PENDING",
+        false, false, false, false, false
+    );
+
+    var result = await controller.UpdateWorkOrder(10, request);
+
+    Assert.IsInstanceOfType<BadRequestObjectResult>(result);
+    serviceMock.Verify(
+        service => service.UpdateAsync(
+            It.IsAny<int>(), It.IsAny<string>(), It.IsAny<WorkOrder>(), It.IsAny<string?>()),
+        Times.Never
+    );
 }
 
 [TestMethod]

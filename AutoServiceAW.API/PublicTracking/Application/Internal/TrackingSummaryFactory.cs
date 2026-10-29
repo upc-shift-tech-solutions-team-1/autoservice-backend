@@ -1,6 +1,7 @@
 using AutoServiceAW.API.PublicTracking.Interfaces.REST;
 using AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates;
 using WorkshopTask = AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.Task;
+using AutoServiceAW.API.StaffCoordination.Domain.Model.Aggregates;
 
 namespace AutoServiceAW.API.PublicTracking.Application.Internal;
 
@@ -11,7 +12,8 @@ public static class TrackingSummaryFactory
 {
     public static TrackingSummaryResource Create(
         WorkOrder workOrder,
-        IEnumerable<WorkshopTask> tasks
+        IEnumerable<WorkshopTask> tasks,
+        Mechanic? primaryMechanic = null
     )
     {
         var taskList = tasks.ToList();
@@ -46,6 +48,16 @@ public static class TrackingSummaryFactory
             ))
             .ToList();
 
+        var estimatedDateHistory = workOrder.EstimatedDateHistory
+            .OrderBy(entry => entry.ChangedAtUtc)
+            .Select(entry => new TrackingEstimatedDateResource(
+                entry.PreviousEstimatedDate,
+                entry.EstimatedDate,
+                entry.Reason,
+                DateTime.SpecifyKind(entry.ChangedAtUtc, DateTimeKind.Utc)
+            ))
+            .ToList();
+
         return new TrackingSummaryResource(
             workOrder.TrackingCode,
             workOrder.Status,
@@ -57,7 +69,11 @@ public static class TrackingSummaryFactory
                 materialsSubtotal,
                 laborSubtotal + materialsSubtotal
             ),
-            history
+            history,
+            estimatedDateHistory,
+            primaryMechanic == null
+                ? null
+                : new TrackingMechanicResource(primaryMechanic.FullName, primaryMechanic.Specialty)
         );
     }
 

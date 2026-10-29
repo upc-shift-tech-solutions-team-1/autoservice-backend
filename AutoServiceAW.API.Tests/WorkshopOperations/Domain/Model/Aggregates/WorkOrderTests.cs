@@ -61,6 +61,45 @@ public class WorkOrderTests
         Assert.AreEqual(startDate, workOrder.StartDate);
     }
 
+    [TestMethod]
+    public void UpdateEstimatedDate_ShouldRecordInitialAndChangedDatesWithReason()
+    {
+        var workOrder = new WorkOrder("workshop-1", 10, 20, 30, "Initial", "2026-10-10", 500m);
+
+        workOrder.Update("Updated", "2026-10-15", 500m, "Falta recibir un repuesto");
+
+        Assert.HasCount(2, workOrder.EstimatedDateHistory);
+        var initial = workOrder.EstimatedDateHistory.First();
+        var change = workOrder.EstimatedDateHistory.Last();
+        Assert.IsNull(initial.PreviousEstimatedDate);
+        Assert.AreEqual("2026-10-10", initial.EstimatedDate);
+        Assert.IsNull(initial.Reason);
+        Assert.AreEqual("2026-10-10", change.PreviousEstimatedDate);
+        Assert.AreEqual("2026-10-15", change.EstimatedDate);
+        Assert.AreEqual("Falta recibir un repuesto", change.Reason);
+        Assert.AreEqual(DateTimeKind.Utc, change.ChangedAtUtc.Kind);
+    }
+
+    [TestMethod]
+    public void UpdateEstimatedDate_WithSameDate_ShouldNotAddHistoryEntry()
+    {
+        var workOrder = new WorkOrder("workshop-1", 10, 20, 30, "Initial", "2026-10-10", 500m);
+
+        workOrder.Update("Updated", "2026-10-10", 500m);
+
+        Assert.HasCount(1, workOrder.EstimatedDateHistory);
+    }
+
+    [TestMethod]
+    public void IsEstimatedDateDelay_ShouldCompareDateOnlyValues()
+    {
+        var workOrder = new WorkOrder("workshop-1", 10, 20, 30, "Initial", "2026-10-10", 500m);
+
+        Assert.IsTrue(workOrder.IsEstimatedDateDelay("2026-10-11"));
+        Assert.IsFalse(workOrder.IsEstimatedDateDelay("2026-10-09"));
+        Assert.IsFalse(workOrder.IsEstimatedDateDelay("2026-10-10"));
+    }
+
     /// <summary>
     /// Verifies that UpdateChecklist updates each work order checklist flag.
     /// </summary>

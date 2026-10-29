@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates;
@@ -93,6 +94,9 @@ public class WorkOrder
     [JsonIgnore]
     public ICollection<WorkOrderStatusHistory> StatusHistory { get; private set; } = new List<WorkOrderStatusHistory>();
 
+    [JsonIgnore]
+    public ICollection<WorkOrderEstimatedDateHistory> EstimatedDateHistory { get; private set; } = new List<WorkOrderEstimatedDateHistory>();
+
     #endregion
 
     #region Constructors
@@ -120,6 +124,7 @@ public class WorkOrder
         TrackingCode = $"WO-{Guid.NewGuid().ToString().Substring(0, 6).ToUpper()}";
         StartDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
         StatusHistory.Add(new WorkOrderStatusHistory(Status, DateTime.UtcNow));
+        EstimatedDateHistory.Add(new WorkOrderEstimatedDateHistory(null, estimatedDate, null, DateTime.UtcNow));
     }
 
     /// <summary>
@@ -146,11 +151,29 @@ public class WorkOrder
     /// <param name="description">The revised descriptive summary text script parameters.</param>
     /// <param name="estimatedDate">The revised expected delivery tracking target timeline date text.</param>
     /// <param name="price">The modified total financial billing price valuation indicator metric.</param>
-    public void Update(string description, string estimatedDate, decimal price)
+    public void Update(string description, string estimatedDate, decimal price, string? estimatedDateChangeReason = null)
     {
         Description = description;
+        if (!string.Equals(EstimatedDate, estimatedDate, StringComparison.Ordinal))
+        {
+            EstimatedDateHistory.Add(new WorkOrderEstimatedDateHistory(
+                EstimatedDate,
+                estimatedDate,
+                estimatedDateChangeReason,
+                DateTime.UtcNow
+            ));
+        }
         EstimatedDate = estimatedDate;
         Price = price;
+    }
+
+    public void UpdatePrice(decimal price) => Price = price;
+
+    public bool IsEstimatedDateDelay(string proposedDate)
+    {
+        return DateOnly.TryParseExact(EstimatedDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var currentDate)
+            && DateOnly.TryParseExact(proposedDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var nextDate)
+            && nextDate > currentDate;
     }
 
     /// <summary>
