@@ -27,11 +27,13 @@ public class WorkOrderRepository(AppDbContext context) : BaseRepository<WorkOrde
     public Task<WorkOrder?> FindByTrackingCodeWithHistoryAsync(string trackingCode) =>
         Context.WorkOrders
             .Include(workOrder => workOrder.StatusHistory)
+            .Include(workOrder => workOrder.EstimatedDateHistory)
             .FirstOrDefaultAsync(workOrder => workOrder.TrackingCode == trackingCode);
 
     public Task<WorkOrder?> FindByIdWithHistoryAsync(int id) =>
         Context.WorkOrders
             .Include(workOrder => workOrder.StatusHistory)
+            .Include(workOrder => workOrder.EstimatedDateHistory)
             .FirstOrDefaultAsync(workOrder => workOrder.Id == id);
 
     #endregion

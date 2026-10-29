@@ -47,6 +47,10 @@ public sealed class WorkOrderTaskLifecycleSteps
 
     private void ConfigureRealTaskService(WebApplicationBuilder builder)
     {
+        builder.Services.AddSingleton<IWorkOrderRepository>(
+            Mock.Of<IWorkOrderRepository>()
+        );
+
         builder.Services.AddSingleton<ITaskRepository>(
             _taskRepositoryMock.Object
         );

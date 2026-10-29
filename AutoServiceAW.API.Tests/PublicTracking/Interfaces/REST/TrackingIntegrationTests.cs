@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.Json;
 using AutoServiceAW.API.CustomerManagement.Domain.Services;
 using AutoServiceAW.API.FleetManagement.Domain.Services;
+using AutoServiceAW.API.StaffCoordination.Domain.Model.Aggregates;
+using AutoServiceAW.API.StaffCoordination.Domain.Repositories;
 using AutoServiceAW.API.PublicTracking.Interfaces.REST;
 using AutoServiceAW.API.TenantManagement.Domain.Repositories;
 using AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates;
@@ -19,6 +21,7 @@ public class TrackingIntegrationTests
 {
     private Mock<IWorkOrderService> _workOrderServiceMock = null!;
     private Mock<ITaskService> _taskServiceMock = null!;
+    private Mock<IMechanicRepository> _mechanicRepositoryMock = null!;
     private WorkOrder _requestedOrder = null!;
     private WebApplication _app = null!;
     private HttpClient _client = null!;
@@ -30,6 +33,7 @@ public class TrackingIntegrationTests
         _requestedOrder = CreateWorkOrder("Requested service");
         _workOrderServiceMock = new Mock<IWorkOrderService>();
         _taskServiceMock = new Mock<ITaskService>();
+        _mechanicRepositoryMock = new Mock<IMechanicRepository>();
 
         _workOrderServiceMock
             .Setup(service => service.GetByTrackingCodeAsync(_requestedOrder.TrackingCode))
@@ -41,6 +45,9 @@ public class TrackingIntegrationTests
         _taskServiceMock
             .Setup(service => service.ListByWorkOrderIdAsync(_requestedOrder.Id))
             .ReturnsAsync(CreateRequestedTasks(_requestedOrder.Id));
+        _mechanicRepositoryMock
+            .Setup(repository => repository.FindByIdAsync(_requestedOrder.MechanicId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Mechanic("Mecánico principal", "Frenos", 5, "private@example.test", _requestedOrder.WorkshopId, "secret"));
 
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -52,6 +59,7 @@ public class TrackingIntegrationTests
         builder.Services.AddSingleton(_taskServiceMock.Object);
         builder.Services.AddSingleton(Mock.Of<ICustomerService>());
         builder.Services.AddSingleton(Mock.Of<IWorkshopRepository>());
+        builder.Services.AddSingleton(_mechanicRepositoryMock.Object);
 
         _app = builder.Build();
         _app.MapControllers();
@@ -125,6 +133,10 @@ public class TrackingIntegrationTests
         Assert.AreEqual(120m, summary.GetProperty("costs").GetProperty("total").GetDecimal());
         Assert.AreEqual(2, summary.GetProperty("tasks").GetArrayLength());
         Assert.AreEqual(1, summary.GetProperty("history").GetArrayLength());
+        Assert.AreEqual(1, summary.GetProperty("estimatedDateHistory").GetArrayLength());
+        Assert.AreEqual("Mecánico principal", summary.GetProperty("primaryMechanic").GetProperty("fullName").GetString());
+        Assert.AreEqual("Frenos", summary.GetProperty("primaryMechanic").GetProperty("specialty").GetString());
+        Assert.AreEqual(2, summary.GetProperty("primaryMechanic").EnumerateObject().Count());
 
         var publicTask = summary.GetProperty("tasks")[0];
         Assert.AreEqual("Diagnóstico de prueba", publicTask.GetProperty("technicalDiagnosis").GetString());

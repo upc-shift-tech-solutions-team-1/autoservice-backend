@@ -12,7 +12,8 @@ namespace AutoServiceAW.API.WorkshopOperations.Application.Internal;
 /// </summary>
 public class TaskService(
     ITaskRepository taskRepository,
-    IUnitOfWork unitOfWork
+    IUnitOfWork unitOfWork,
+    IWorkOrderRepository workOrderRepository
 ) : ITaskService
 {
     #region Methods
@@ -32,7 +33,15 @@ public class TaskService(
         WorkshopTask task
     )
     {
+        var tasks = await taskRepository.FindByWorkOrderIdAsync(task.WorkOrderId)
+            ?? Enumerable.Empty<WorkshopTask>();
+        var workOrder = await workOrderRepository.FindByIdAsync(task.WorkOrderId);
         await taskRepository.AddAsync(task);
+        if (workOrder != null)
+        {
+            workOrder.UpdatePrice(tasks.Sum(existing => existing.TotalCost) + task.TotalCost);
+            workOrderRepository.Update(workOrder);
+        }
         await unitOfWork.CompleteAsync();
 
         return task;
@@ -138,18 +147,8 @@ public class TaskService(
             updatedTask.MechanicId,
             updatedTask.LaborCost
         );
-        existingTask.Parts.Clear();
-        
-        if (updatedTask.Parts != null && updatedTask.Parts.Any())
-        {
-            foreach (var newPart in updatedTask.Parts)
-            {
-                existingTask.Parts.Add(newPart);
-            }
-        }
-
-        // 3. Guardamos los cambios
         taskRepository.Update(existingTask);
+        await RecalculateWorkOrderPriceAsync(existingTask.WorkOrderId);
         await unitOfWork.CompleteAsync();
 
         return existingTask;
@@ -272,8 +271,27 @@ public class TaskService(
             return;
         }
 
+        await RecalculateWorkOrderPriceAsync(existingTask.WorkOrderId, existingTask.Id);
         taskRepository.Remove(existingTask);
         await unitOfWork.CompleteAsync();
+    }
+
+    private async Task RecalculateWorkOrderPriceAsync(int workOrderId, int? excludedTaskId = null)
+    {
+        var workOrder = await workOrderRepository.FindByIdAsync(workOrderId);
+        if (workOrder == null)
+        {
+            return;
+        }
+
+        var tasks = await taskRepository.FindByWorkOrderIdAsync(workOrderId)
+            ?? Enumerable.Empty<WorkshopTask>();
+        var total = tasks
+            .Where(task => task.Id != excludedTaskId)
+            .Sum(task => task.TotalCost);
+
+        workOrder.UpdatePrice(total);
+        workOrderRepository.Update(workOrder);
     }
 
     #endregion

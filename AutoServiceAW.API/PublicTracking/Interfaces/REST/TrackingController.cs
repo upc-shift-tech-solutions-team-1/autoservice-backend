@@ -5,6 +5,7 @@ using AutoServiceAW.API.PublicTracking.Application.Internal;
 using AutoServiceAW.API.CustomerManagement.Domain.Services;
 using AutoServiceAW.API.FleetManagement.Domain.Services;
 using AutoServiceAW.API.TenantManagement.Domain.Repositories;
+using AutoServiceAW.API.StaffCoordination.Domain.Repositories;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -20,19 +21,22 @@ namespace AutoServiceAW.API.PublicTracking.Interfaces.REST
         private readonly ITaskService _taskService;
         private readonly ICustomerService _customerService;
         private readonly IWorkshopRepository _workshopRepository;
+        private readonly IMechanicRepository _mechanicRepository;
 
         public TrackingController(
             IWorkOrderService workOrderService,
             IVehicleService vehicleService,
             ITaskService taskService,
             ICustomerService customerService,
-            IWorkshopRepository workshopRepository)
+            IWorkshopRepository workshopRepository,
+            IMechanicRepository mechanicRepository)
         {
             _workOrderService = workOrderService;
             _vehicleService = vehicleService;
             _taskService = taskService;
             _customerService = customerService;
             _workshopRepository = workshopRepository;
+            _mechanicRepository = mechanicRepository;
         }
 
         [HttpGet("workorders")]
@@ -65,7 +69,13 @@ namespace AutoServiceAW.API.PublicTracking.Interfaces.REST
             if (order == null) return NotFound();
 
             var tasks = await _taskService.ListByWorkOrderIdAsync(order.Id);
-            return Ok(TrackingSummaryFactory.Create(order, tasks));
+            var mechanic = await _mechanicRepository.FindByIdAsync(order.MechanicId);
+            if (mechanic != null && !string.Equals(mechanic.WorkshopId, order.WorkshopId, StringComparison.Ordinal))
+            {
+                mechanic = null;
+            }
+
+            return Ok(TrackingSummaryFactory.Create(order, tasks, mechanic));
         }
 
         [HttpGet("vehicles/{id}")]

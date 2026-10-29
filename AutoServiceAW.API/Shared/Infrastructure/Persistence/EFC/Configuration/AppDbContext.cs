@@ -46,6 +46,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     /// <summary>Gets the persisted status changes for workshop work orders.</summary>
     public DbSet<WorkOrderStatusHistory> WorkOrderStatusHistory { get; set; }
 
+    /// <summary>Gets the persisted estimated delivery date changes for workshop work orders.</summary>
+    public DbSet<WorkOrderEstimatedDateHistory> WorkOrderEstimatedDateHistory { get; set; }
+
     /// <summary>
     /// Gets or sets the database persistence tracking mapping context for assigned diagnostic tasks.
     /// </summary>
@@ -164,6 +167,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         builder.Entity<WorkOrderStatusHistory>()
             .HasOne(history => history.WorkOrder)
             .WithMany(workOrder => workOrder.StatusHistory)
+            .HasForeignKey(history => history.WorkOrderId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Estimated delivery date history mapping
+        builder.Entity<WorkOrderEstimatedDateHistory>().ToTable("WorkOrderEstimatedDateHistory");
+        builder.Entity<WorkOrderEstimatedDateHistory>().HasKey(history => history.Id);
+        builder.Entity<WorkOrderEstimatedDateHistory>().Property(history => history.Id).IsRequired().ValueGeneratedOnAdd();
+        builder.Entity<WorkOrderEstimatedDateHistory>().Property(history => history.PreviousEstimatedDate).HasMaxLength(50);
+        builder.Entity<WorkOrderEstimatedDateHistory>().Property(history => history.EstimatedDate).IsRequired().HasMaxLength(50);
+        builder.Entity<WorkOrderEstimatedDateHistory>().Property(history => history.Reason).HasMaxLength(1000);
+        builder.Entity<WorkOrderEstimatedDateHistory>().Property(history => history.ChangedAtUtc).IsRequired().HasColumnType("datetime(6)");
+        builder.Entity<WorkOrderEstimatedDateHistory>()
+            .HasOne(history => history.WorkOrder)
+            .WithMany(workOrder => workOrder.EstimatedDateHistory)
             .HasForeignKey(history => history.WorkOrderId)
             .OnDelete(DeleteBehavior.Cascade);
         

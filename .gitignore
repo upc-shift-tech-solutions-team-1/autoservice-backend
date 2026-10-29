@@ -11,8 +11,6 @@
 
 .DS_Store
 
-.env
-.env.*
 
 branch_structure.json
 temp_auto_push.bat
@@ -23,5 +21,6 @@ temp_interactive_push.bat
 .gitignore
 **/*.feature.cs
 
-.vscode/
 public/
+config.bat
+node_modules

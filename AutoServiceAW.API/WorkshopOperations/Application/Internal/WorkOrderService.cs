@@ -8,7 +8,7 @@ namespace AutoServiceAW.API.WorkshopOperations.Application.Internal;
 /// <summary>
 /// Provides internal application services for coordinating high-level workshop work orders and vehicle processing pipelines.
 /// </summary>
-public class WorkOrderService(IWorkOrderRepository workOrderRepository, IUnitOfWork unitOfWork) : IWorkOrderService
+public class WorkOrderService(IWorkOrderRepository workOrderRepository, ITaskRepository taskRepository, IUnitOfWork unitOfWork) : IWorkOrderService
 {
     #region Methods
 
@@ -57,7 +57,8 @@ public class WorkOrderService(IWorkOrderRepository workOrderRepository, IUnitOfW
     public async System.Threading.Tasks.Task<WorkOrder?> UpdateAsync(
         int id,
         string authenticatedWorkshopId,
-        WorkOrder updatedWorkOrder)
+        WorkOrder updatedWorkOrder,
+        string? estimatedDateChangeReason = null)
     {
         // Verificar que exista una identidad de taller válida.
         if (string.IsNullOrWhiteSpace(authenticatedWorkshopId))
@@ -84,8 +85,13 @@ public class WorkOrderService(IWorkOrderRepository workOrderRepository, IUnitOfW
         existingWorkOrder.Update(
             updatedWorkOrder.Description,
             updatedWorkOrder.EstimatedDate,
-            updatedWorkOrder.Price
+            updatedWorkOrder.Price,
+            estimatedDateChangeReason
         );
+
+        var tasks = await taskRepository.FindByWorkOrderIdAsync(id)
+            ?? Enumerable.Empty<AutoServiceAW.API.WorkshopOperations.Domain.Model.Aggregates.Task>();
+        existingWorkOrder.UpdatePrice(tasks.Sum(task => task.TotalCost));
 
         existingWorkOrder.UpdateChecklist(
             updatedWorkOrder.TasksCompleted,
