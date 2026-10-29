@@ -468,8 +468,9 @@ public async System.Threading.Tasks.Task
         .Setup(value => value.UpdateAsync(
             41,
             "WS-01",
-            It.IsAny<WorkOrder>()))
-        .ReturnsAsync((int _, string _, WorkOrder updated) => updated);
+            It.IsAny<WorkOrder>(),
+            It.IsAny<string?>()))
+        .ReturnsAsync((int _, string _, WorkOrder updated, string? _) => updated);
 
     var builder = WebApplication.CreateBuilder();
     builder.WebHost.UseTestServer();
@@ -508,7 +509,8 @@ public async System.Threading.Tasks.Task
         true,
         true,
         true,
-        true
+        true,
+        "El proveedor retrasó la entrega del material"
     );
 
     // Act
@@ -530,7 +532,8 @@ public async System.Threading.Tasks.Task
             It.Is<WorkOrder>(order =>
                 order.WorkshopId == "WS-01" &&
                 order.Description == "Brake repair completed" &&
-                order.Price == 750m)),
+                order.Price == 750m),
+            "El proveedor retrasó la entrega del material"),
         Times.Once
     );
 }

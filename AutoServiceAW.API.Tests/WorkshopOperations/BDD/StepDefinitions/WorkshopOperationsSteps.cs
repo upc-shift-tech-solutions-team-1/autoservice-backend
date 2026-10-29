@@ -78,6 +78,10 @@ public sealed class WorkshopOperationsSteps
 
         if (_useRealTaskService)
         {
+            builder.Services.AddSingleton<IWorkOrderRepository>(
+                Mock.Of<IWorkOrderRepository>()
+            );
+
             builder.Services.AddSingleton<ITaskRepository>(
                 _taskRepositoryMock.Object
             );

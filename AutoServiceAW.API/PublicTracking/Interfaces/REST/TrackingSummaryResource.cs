@@ -7,7 +7,9 @@ public sealed record TrackingSummaryResource(
     string EstimatedDate,
     IReadOnlyList<TrackingTaskResource> Tasks,
     TrackingCostBreakdownResource Costs,
-    IReadOnlyList<TrackingStageResource> History
+    IReadOnlyList<TrackingStageResource> History,
+    IReadOnlyList<TrackingEstimatedDateResource> EstimatedDateHistory,
+    TrackingMechanicResource? PrimaryMechanic
 );
 
 public sealed record TrackingTaskResource(
@@ -46,4 +48,16 @@ public sealed record TrackingCostBreakdownResource(
 public sealed record TrackingStageResource(
     string Status,
     DateTime ChangedAtUtc
+);
+
+public sealed record TrackingEstimatedDateResource(
+    string? PreviousEstimatedDate,
+    string EstimatedDate,
+    string? Reason,
+    DateTime ChangedAtUtc
+);
+
+public sealed record TrackingMechanicResource(
+    string FullName,
+    string Specialty
 );
