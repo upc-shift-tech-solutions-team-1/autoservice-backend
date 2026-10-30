@@ -27,7 +27,7 @@ public record CreateWorkOrderResource(int VehicleId, int CustomerId, int Mechani
 /// <param name="DiagnosisValidated">The quality audit verification step tracking analytical mechanical assessment signature verification flag.</param>
 /// <param name="CleaningDone">The final delivery quality checkpoint tracking vehicle car cosmetic cleanup completion flag.</param>
 /// <param name="FinalTestDone">The final delivery quality checkpoint tracking road trial driving test verification flag.</param>
-public record UpdateWorkOrderResource(string Description, string EstimatedDate, decimal Price, string Status, bool TasksCompleted, bool SparePartsChecked, bool DiagnosisValidated, bool CleaningDone, bool FinalTestDone);
+public record UpdateWorkOrderResource(string Description, string EstimatedDate, decimal Price, string Status, bool TasksCompleted, bool SparePartsChecked, bool DiagnosisValidated, bool CleaningDone, bool FinalTestDone, string? DelayReason = null);
 
 /// <summary>
 /// Exposes RESTful endpoints for initiating main maintenance work folders, evaluating checklist metrics data grids, and fetching multi-tenant collections arrays.
@@ -142,6 +142,17 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
             return NotFound();
         }
 
+        if (existingOrder.IsEstimatedDateDelay(resource.EstimatedDate) &&
+            string.IsNullOrWhiteSpace(resource.DelayReason))
+        {
+            return BadRequest(new { message = "Debe indicar el motivo cuando se retrasa la fecha estimada." });
+        }
+
+        if (resource.DelayReason?.Length > 1000)
+        {
+            return BadRequest(new { message = "El motivo del cambio no debe superar los 1000 caracteres." });
+        }
+
         // Preparar los cambios solamente después de autorizar.
         var updatedOrder = new WorkOrder(
             tenantId,
@@ -168,7 +179,8 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
         var result = await workOrderService.UpdateAsync(
             id,
             tenantId,
-            updatedOrder
+            updatedOrder,
+            resource.DelayReason
         );
 
 

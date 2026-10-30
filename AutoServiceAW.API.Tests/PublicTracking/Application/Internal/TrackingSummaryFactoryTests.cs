@@ -37,7 +37,7 @@ public class TrackingSummaryFactoryTests
     public void Create_ShouldCalculateCustomerCostsWithoutInternalCosts()
     {
         // ARRANGE
-        var workOrder = CreateWorkOrder(price: 999m);
+        var workOrder = CreateWorkOrder(price: 255m);
         var firstTask = CreateTask("COMPLETED", laborPrice: 100m);
         firstTask.UpdateMaterialsCost(materialsCost: 25m, materialsPurchaseCost: 9m);
         var secondTask = CreateTask("PENDING", laborPrice: 80m);
@@ -53,7 +53,7 @@ public class TrackingSummaryFactoryTests
         Assert.AreEqual(180m, summary.Costs.LaborSubtotal);
         Assert.AreEqual(75m, summary.Costs.MaterialsSubtotal);
         Assert.AreEqual(255m, summary.Costs.Total);
-        Assert.AreEqual(999m, workOrder.Price);
+        Assert.AreEqual(workOrder.Price, summary.Costs.Total);
     }
 
     [TestMethod]

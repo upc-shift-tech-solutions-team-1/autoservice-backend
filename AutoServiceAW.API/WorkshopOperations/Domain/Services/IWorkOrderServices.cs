@@ -48,7 +48,8 @@ public interface IWorkOrderService
     System.Threading.Tasks.Task<WorkOrder?> UpdateAsync(
         int id,
         string authenticatedWorkshopId,
-        WorkOrder workOrder
+        WorkOrder workOrder,
+        string? estimatedDateChangeReason = null
     );
 
     /// <summary>
