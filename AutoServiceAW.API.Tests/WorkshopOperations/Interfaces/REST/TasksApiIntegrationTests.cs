@@ -81,6 +81,9 @@ public class TasksApiIntegrationTests
         builder.Services.AddSingleton<ITaskRepository>(
             taskRepositoryMock.Object
         );
+        builder.Services.AddSingleton<IWorkOrderRepository>(
+            Mock.Of<IWorkOrderRepository>()
+        );
         builder.Services.AddSingleton<IUnitOfWork>(
             unitOfWorkMock.Object
         );
@@ -234,6 +237,7 @@ public class TasksApiIntegrationTests
             .AddControllers()
             .AddApplicationPart(typeof(TasksController).Assembly);
         builder.Services.AddSingleton<ITaskRepository>(taskRepositoryMock.Object);
+        builder.Services.AddSingleton<IWorkOrderRepository>(Mock.Of<IWorkOrderRepository>());
         builder.Services.AddSingleton<IInventoryItemRepository>(inventoryRepositoryMock.Object);
         builder.Services.AddSingleton<IUnitOfWork>(unitOfWorkMock.Object);
         builder.Services.AddScoped<ITaskService, TaskService>();

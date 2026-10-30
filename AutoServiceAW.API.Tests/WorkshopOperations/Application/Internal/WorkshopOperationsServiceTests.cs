@@ -38,7 +38,8 @@ public class WorkshopOperationsServiceTests
 
         var service = new TaskService(
             repository.Object,
-            unitOfWork.Object
+            unitOfWork.Object,
+            Mock.Of<IWorkOrderRepository>()
         );
 
         // Act
@@ -102,11 +103,16 @@ public class WorkshopOperationsServiceTests
         requestedUpdate.UpdateStatus("COMPLETED");
 
         var repository = new Mock<IWorkOrderRepository>();
+        var taskRepository = new Mock<ITaskRepository>();
         var unitOfWork = new Mock<IUnitOfWork>();
 
         repository
             .Setup(value => value.FindByIdWithHistoryAsync(41))
             .ReturnsAsync(existingOrder);
+
+        taskRepository
+            .Setup(value => value.FindByWorkOrderIdAsync(41))
+            .ReturnsAsync(new[] { new WorkshopTask(41, 8, "Brake repair", "COMPLETED", "NORMAL", 30, 420m) });
 
         unitOfWork
             .Setup(value => value.CompleteAsync())
@@ -114,6 +120,7 @@ public class WorkshopOperationsServiceTests
 
         var service = new WorkOrderService(
             repository.Object,
+            taskRepository.Object,
             unitOfWork.Object
         );
 
@@ -180,6 +187,7 @@ public class WorkshopOperationsServiceTests
 
         var service = new WorkOrderService(
             repository.Object,
+            Mock.Of<ITaskRepository>(),
             unitOfWork.Object
         );
 
@@ -239,6 +247,7 @@ public class WorkshopOperationsServiceTests
 
         var service = new WorkOrderService(
             repository.Object,
+            Mock.Of<ITaskRepository>(),
             unitOfWork.Object
         );
 
@@ -285,6 +294,7 @@ public class WorkshopOperationsServiceTests
 
         var service = new WorkOrderService(
             repository.Object,
+            Mock.Of<ITaskRepository>(),
             unitOfWork.Object
         );
 
@@ -313,6 +323,7 @@ public class WorkshopOperationsServiceTests
 
         var service = new WorkOrderService(
             repository.Object,
+            Mock.Of<ITaskRepository>(),
             unitOfWork.Object
         );
 
@@ -357,6 +368,7 @@ public class WorkshopOperationsServiceTests
 
         var service = new WorkOrderService(
             repository.Object,
+            Mock.Of<ITaskRepository>(),
             unitOfWork.Object
         );
 
