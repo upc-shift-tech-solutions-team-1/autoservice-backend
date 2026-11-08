@@ -1,3 +1,4 @@
+
 using System.Text;
 using AutoServiceAW.API.CustomerManagement.Application.Internal;
 using AutoServiceAW.API.CustomerManagement.Domain.Repositories;
@@ -37,23 +38,20 @@ using Microsoft.OpenApi.Models;
 
 /// <summary>
 /// The main entry point configuration file for the Web Application.
-/// Sets up the dependency injection container, authentication infrastructure middleware,
-/// multi-tenant database context connections, and HTTP pipelines.
+/// Configures dependency injection, authentication, authorization,
+/// database connections, CORS, health checks and HTTP middleware.
 /// </summary>
 var builder = WebApplication.CreateBuilder(args);
 
 #region Controller and API Explorer Configuration
 
-// Add framework service controller endpoints to the DI container.
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
 });
 
-// Configure API endpoint explorer.
 builder.Services.AddEndpointsApiExplorer();
 
-// Configure Swagger documentation and JWT authentication support.
 builder.Services.AddSwaggerGen(options =>
 {
     options.EnableAnnotations();
@@ -84,7 +82,6 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Enforce uniform lower-case formatting policies on REST routes.
 builder.Services.Configure<RouteOptions>(
     options => options.LowercaseUrls = true
 );
@@ -93,7 +90,6 @@ builder.Services.Configure<RouteOptions>(
 
 #region Database Connection Configuration
 
-// Extract the relational primary database connection string.
 var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -112,36 +108,36 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 #region Dependency Injection Registrations
 
-// Shared Context Boundary Infrastructure Registrations
+// Shared Context Boundary
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-// Staff Coordination Bounded Context Registrations
+// Staff Coordination
 builder.Services.AddScoped<IMechanicRepository, MechanicRepository>();
 builder.Services.AddScoped<IMechanicService, MechanicService>();
 
-// Inventory Management Bounded Context Registrations
+// Inventory Management
 builder.Services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
 builder.Services.AddScoped<IInventoryItemService, InventoryItemService>();
 
-// Customer Management Bounded Context Registrations
+// Customer Management
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 
-// Fleet Management Bounded Context Registrations
+// Fleet Management
 builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
 builder.Services.AddScoped<IVehicleService, VehicleService>();
 
-// Workshop Operations Bounded Context Registrations
+// Workshop Operations
 builder.Services.AddScoped<IWorkOrderRepository, WorkOrderRepository>();
 builder.Services.AddScoped<IWorkOrderService, WorkOrderService>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 
-// Identity and Access Management (IAM) Bounded Context Registrations
+// Identity and Access Management
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Tenant Management Bounded Context Registrations
+// Tenant Management
 builder.Services.AddScoped<IWorkshopRepository, WorkshopRepository>();
 builder.Services.AddScoped<IWorkshopService, WorkshopService>();
 
@@ -149,11 +145,10 @@ builder.Services.AddScoped<IWorkshopService, WorkshopService>();
 
 #region Security and Authentication Infrastructure
 
-// Extract JWT token validation configuration properties.
+// JWT configuration
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.ASCII.GetBytes(jwtSettings["Secret"]!);
 
-// Configure JWT authentication.
 builder.Services
     .AddAuthentication(options =>
     {
@@ -181,22 +176,27 @@ builder.Services
             };
     });
 
-// Register authorization services so controllers can use
-// [Authorize] and role-based authorization.
 builder.Services.AddAuthorization();
-// Register health check services for application monitoring.
+
+// Health checks
 builder.Services.AddHealthChecks();
-// Configure cross-origin sharing policies for client applications.
+
+// CORS: allow only explicitly configured frontend origins.
+// Configuration key: Cors:AllowedOrigins
+// Render environment variables: Cors__AllowedOrigins__0, etc.
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? Array.Empty<string>();
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(
-        "AllowAll",
-        policy =>
-            policy
-                .AllowAnyOrigin()
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-    );
+    options.AddPolicy("AllowConfiguredFrontends", policy =>
+    {
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
 });
 
 #endregion
@@ -205,37 +205,42 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Enable Swagger API documentation.
+// Swagger configuration retained.
+// Production exposure will be reviewed separately.
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Preserve existing HTTPS behavior for Render compatibility.
 if (!app.Environment.IsProduction())
 {
     app.UseHttpsRedirection();
 }
-// Configure CORS before authentication/authorization.
-app.UseCors("AllowAll");
 
-// Validate JWT credentials.
+// Route requests before applying CORS.
+app.UseRouting();
+
+// Apply CORS before authentication and authorization.
+app.UseCors("AllowConfiguredFrontends");
+
+// Authentication and authorization
 app.UseAuthentication();
-
-// Enforce authorization rules such as [Authorize]
-// and [Authorize(Roles = "...")].
 app.UseAuthorization();
 
-// Map controller routes.
+// REST controllers
 app.MapControllers();
-// Expose a health check endpoint for application monitoring.
+
+// Health endpoint for monitoring
 app.MapHealthChecks("/health");
 
-// Map controller routes.
-app.MapControllers();
+#endregion
+
+#region Database Migrations
+
 /*
  * Database migrations are executed only when explicitly enabled
- * through the Database:ApplyMigrationsOnStartup configuration.
+ * through Database:ApplyMigrationsOnStartup.
  *
- * The default value is false when the property does not exist,
- * preventing accidental changes to an external or production database.
+ * The default value is false when the property does not exist.
  */
 var applyMigrationsOnStartup =
     builder.Configuration.GetValue<bool>(
@@ -270,7 +275,7 @@ if (applyMigrationsOnStartup)
     }
 }
 
-// Execute the web application.
-app.Run();
-
 #endregion
+
+// Start the application.
+app.Run();
