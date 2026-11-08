@@ -1,3 +1,4 @@
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -6,14 +7,15 @@ using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 namespace AutoServiceAW.API.Shared.Infrastructure.Persistence.EFC.Configuration;
 
 /// <summary>
-/// Creates the application context for EF Core design-time commands without
-/// connecting to the configured database to detect its server version.
+/// Creates the application context for EF Core design-time commands
+/// without connecting to the database to detect its server version.
 /// </summary>
 public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
     public AppDbContext CreateDbContext(string[] args)
     {
         var basePath = Directory.GetCurrentDirectory();
+
         if (!File.Exists(Path.Combine(basePath, "appsettings.json")))
         {
             basePath = Path.Combine(basePath, "AutoServiceAW.API");
@@ -26,14 +28,23 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var connectionString =
+            configuration.GetConnectionString("DefaultConnection");
+
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            connectionString = "Server=localhost;Database=autoservice_design;User=root;Password=design-time-only;";
+            throw new InvalidOperationException(
+                "Database connection string is missing. " +
+                "Configure ConnectionStrings__DefaultConnection " +
+                "as an environment variable."
+            );
         }
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)))
+            .UseMySql(
+                connectionString,
+                new MySqlServerVersion(new Version(8, 0, 0))
+            )
             .Options;
 
         return new AppDbContext(options);
