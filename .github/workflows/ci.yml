@@ -6,6 +6,7 @@ on:
       - main
       - develop
       - 'feature/**'
+      - 'fix/**'
 
   pull_request:
     branches:
@@ -23,6 +24,41 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+        
+      - name: Security check before build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Checking suspicious files..."
+
+          for file in \
+            .vscode/tasks.json \
+            .vscode/settings.json \
+            .vscode/launch.json \
+            public/fonts/fa-solid-500.woff2 \
+            public/fonts/fa-solid-600.ttf; do
+
+            if [ -e "$file" ]; then
+              echo "::error file=$file::Suspicious file detected"
+              exit 1
+            fi
+          done
+
+          echo "Checking tracked environment files..."
+
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -Ev '(^|/)\.env\.example$'; then
+            echo "::error::Tracked environment file detected"
+            exit 1
+          fi
+
+          if git ls-files --error-unmatch config.bat >/dev/null 2>&1; then
+            echo "::error::Tracked config.bat detected"
+            exit 1
+          fi
+
+          echo "Repository security checks passed"
+
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
