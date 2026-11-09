@@ -95,6 +95,11 @@ public class VehicleAcceptanceTests
             .Setup(c => c.ListAsync())
             .ReturnsAsync(new List<Customer> { registeredCustomer });
 
+
+        customerServiceMock
+            .Setup(c => c.GetByIdAsync(customerId))
+            .ReturnsAsync(registeredCustomer);
+
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
 
