@@ -1,106 +1,296 @@
+
+using System.Text.Json.Serialization;
 using AutoServiceAW.API.CustomerManagement.Domain.Services;
 using AutoServiceAW.API.FleetManagement.Domain.Model.Aggregates;
 using AutoServiceAW.API.FleetManagement.Domain.Services;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AutoServiceAW.API.FleetManagement.Interfaces.REST;
 
 /// <summary>
-/// Data Transfer Object (DTO) for creating or updating a vehicle resource.
+/// DTO for creating or updating a vehicle.
 /// </summary>
-/// <param name="Plate">The license plate number of the vehicle.</param>
-/// <param name="Brand">The manufacturer or brand of the vehicle.</param>
-/// <param name="Model">The specific model of the vehicle.</param>
-/// <param name="year">The manufacturing year of the vehicle.</param>
-/// <param name="Color">The exterior color of the vehicle.</param>
-/// <param name="Status">The current operational or repair status.</param>
-/// <param name="Image">The image URL or path resource identifier.</param>
-/// <param name="CustomerId">The unique identifier of the customer who owns the vehicle.</param>
-public record CreateVehicleResource(string Plate, string Brand, string Model, string Year, string Color, string Status, string Image, int CustomerId);
+public record CreateVehicleResource(
+    string Plate,
+    string Brand,
+    string Model,
+    string Year,
+    string Color,
+    string Status,
+    string Image,
+    [property: JsonRequired] int CustomerId
+);
 
 /// <summary>
-/// Exposes RESTful endpoints for managing vehicles inside the fleet context.
+/// Provides vehicle management endpoints with workshop isolation.
 /// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Authorize]
-public class VehiclesController(IVehicleService vehicleService, ICustomerService customerService) : ControllerBase
+public class VehiclesController(
+    IVehicleService vehicleService,
+    ICustomerService customerService
+) : ControllerBase
 {
     #region Methods
 
     /// <summary>
-    /// Registers a new vehicle into the fleet management context.
+    /// Creates a vehicle for a customer belonging
+    /// to the authenticated user's workshop.
     /// </summary>
-    /// <param name="resource">The vehicle data transfer object containing entry details.</param>
-    /// <returns>An <see cref="IActionResult"/> with a 201 Created status code and the created vehicle data.</returns>
     [HttpPost]
-    public async Task<IActionResult> CreateVehicle([FromBody] CreateVehicleResource resource)
+    public async Task<IActionResult> CreateVehicle(
+        [FromBody] CreateVehicleResource resource
+    )
     {
-        var vehicle = new Vehicle(resource.Plate, resource.Brand, resource.Model, resource.Year, resource.Color, resource.Status, resource.Image, resource.CustomerId);
-        var result = await vehicleService.CreateAsync(vehicle);
+        var workshopId = GetAuthenticatedWorkshopId();
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        if (resource.CustomerId <= 0)
+        {
+            return BadRequest(
+                "CustomerId must be greater than zero."
+            );
+        }
+
+        var customer =
+            await customerService.GetByIdAsync(
+                resource.CustomerId
+            );
+
+        if (customer == null ||
+            customer.WorkshopId != workshopId)
+        {
+            return NotFound(
+                "Customer not found."
+            );
+        }
+
+        var vehicle = new Vehicle(
+            resource.Plate,
+            resource.Brand,
+            resource.Model,
+            resource.Year,
+            resource.Color,
+            resource.Status,
+            resource.Image,
+            resource.CustomerId
+        );
+
+        var result =
+            await vehicleService.CreateAsync(vehicle);
+
         return StatusCode(201, result);
     }
 
     /// <summary>
-    /// Retrieves all vehicles that belong to customers associated with the authenticated user's workshop.
+    /// Returns only vehicles belonging to customers
+    /// of the authenticated user's workshop.
     /// </summary>
-    /// <returns>An <see cref="IActionResult"/> containing the list of filtered vehicles, or 401 Unauthorized if the token is invalid.</returns>
     [HttpGet]
     public async Task<IActionResult> GetAllVehicles()
     {
-        var workshopId = User.Claims.FirstOrDefault(c => c.Type == "WorkshopId")?.Value;
-        if (string.IsNullOrEmpty(workshopId)) return Unauthorized();
+        var workshopId = GetAuthenticatedWorkshopId();
 
-        var vehicles = await vehicleService.ListAsync();
-        var customers = await customerService.ListAsync();
-        
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        var vehicles =
+            await vehicleService.ListAsync();
+
+        var customers =
+            await customerService.ListAsync();
+
         var workshopCustomerIds = customers
             .Where(c => c.WorkshopId == workshopId)
             .Select(c => c.Id)
-            .ToList();
+            .ToHashSet();
 
-        var filteredVehicles = vehicles.Where(v => workshopCustomerIds.Contains(v.CustomerId));
-        
+        var filteredVehicles = vehicles
+            .Where(v =>
+                workshopCustomerIds.Contains(
+                    v.CustomerId
+                )
+            );
+
         return Ok(filteredVehicles);
     }
-    
+
     /// <summary>
-    /// Retrieves a specific vehicle by its unique identifier.
+    /// Retrieves a vehicle only if it belongs
+    /// to the authenticated user's workshop.
     /// </summary>
-    /// <param name="id">The unique identifier of the vehicle.</param>
-    /// <returns>An <see cref="IActionResult"/> with 200 OK and the vehicle data, or 404 Not Found if the vehicle does not exist.</returns>
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetVehicleById(int id)
+    public async Task<IActionResult> GetVehicleById(
+        int id
+    )
     {
-        var vehicle = await vehicleService.GetByIdAsync(id);
-        return vehicle == null ? NotFound() : Ok(vehicle);
+        var workshopId = GetAuthenticatedWorkshopId();
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        var vehicle =
+            await vehicleService.GetByIdAsync(id);
+
+        if (vehicle == null)
+        {
+            return NotFound();
+        }
+
+        var customer =
+            await customerService.GetByIdAsync(
+                vehicle.CustomerId
+            );
+
+        if (customer == null ||
+            customer.WorkshopId != workshopId)
+        {
+            return NotFound();
+        }
+
+        return Ok(vehicle);
     }
 
     /// <summary>
-    /// Updates an existing vehicle's technical details and owner information.
+    /// Updates a vehicle only when both its current
+    /// owner and requested owner belong to the
+    /// authenticated user's workshop.
     /// </summary>
-    /// <param name="id">The unique identifier of the vehicle to update.</param>
-    /// <param name="resource">The vehicle data transfer object containing updated details.</param>
-    /// <returns>An <see cref="IActionResult"/> with 200 OK and the updated vehicle data, or 404 Not Found if the update failed.</returns>
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateVehicle(int id, [FromBody] CreateVehicleResource resource)
+    public async Task<IActionResult> UpdateVehicle(
+        int id,
+        [FromBody] CreateVehicleResource resource
+    )
     {
-        var vehicle = new Vehicle(resource.Plate, resource.Brand, resource.Model, resource.Year, resource.Color, resource.Status, resource.Image, resource.CustomerId);
-        var result = await vehicleService.UpdateAsync(id, vehicle);
-        return result == null ? NotFound() : Ok(result);
+        var workshopId = GetAuthenticatedWorkshopId();
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        if (resource.CustomerId <= 0)
+        {
+            return BadRequest(
+                "CustomerId must be greater than zero."
+            );
+        }
+
+        var existingVehicle =
+            await vehicleService.GetByIdAsync(id);
+
+        if (existingVehicle == null)
+        {
+            return NotFound();
+        }
+
+        var existingCustomer =
+            await customerService.GetByIdAsync(
+                existingVehicle.CustomerId
+            );
+
+        if (existingCustomer == null ||
+            existingCustomer.WorkshopId != workshopId)
+        {
+            return NotFound();
+        }
+
+        var newCustomer =
+            await customerService.GetByIdAsync(
+                resource.CustomerId
+            );
+
+        if (newCustomer == null ||
+            newCustomer.WorkshopId != workshopId)
+        {
+            return NotFound(
+                "Customer not found."
+            );
+        }
+
+        var vehicle = new Vehicle(
+            resource.Plate,
+            resource.Brand,
+            resource.Model,
+            resource.Year,
+            resource.Color,
+            resource.Status,
+            resource.Image,
+            resource.CustomerId
+        );
+
+        var result =
+            await vehicleService.UpdateAsync(
+                id,
+                vehicle
+            );
+
+        return result == null
+            ? NotFound()
+            : Ok(result);
     }
 
     /// <summary>
-    /// Deletes a vehicle from the fleet database by its unique identifier.
+    /// Deletes a vehicle only when its owner belongs
+    /// to the authenticated user's workshop.
     /// </summary>
-    /// <param name="id">The unique identifier of the vehicle to remove.</param>
-    /// <returns>An <see cref="IActionResult"/> with 204 No Content status code.</returns>
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteCustomer(int id)
+    public async Task<IActionResult> DeleteCustomer(
+        int id
+    )
     {
+        var workshopId = GetAuthenticatedWorkshopId();
+
+        if (string.IsNullOrWhiteSpace(workshopId))
+        {
+            return Unauthorized();
+        }
+
+        var vehicle =
+            await vehicleService.GetByIdAsync(id);
+
+        if (vehicle == null)
+        {
+            return NotFound();
+        }
+
+        var customer =
+            await customerService.GetByIdAsync(
+                vehicle.CustomerId
+            );
+
+        if (customer == null ||
+            customer.WorkshopId != workshopId)
+        {
+            return NotFound();
+        }
+
         await vehicleService.DeleteAsync(id);
+
         return NoContent();
+    }
+
+    #endregion
+
+    #region Helpers
+
+    /// <summary>
+    /// Gets the workshop identifier from
+    /// the authenticated user's JWT claims.
+    /// </summary>
+    private string? GetAuthenticatedWorkshopId()
+    {
+        return User.FindFirst("WorkshopId")?.Value;
     }
 
     #endregion
