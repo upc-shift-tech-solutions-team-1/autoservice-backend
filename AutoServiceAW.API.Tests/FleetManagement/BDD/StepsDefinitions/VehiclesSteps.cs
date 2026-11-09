@@ -1,4 +1,4 @@
-
+using AutoServiceAW.API.CustomerManagement.Domain.Model.Aggregates;
 using System.Net;
 using System.Net.Http.Json;
 using AutoServiceAW.API.CustomerManagement.Domain.Services;
@@ -34,6 +34,17 @@ public sealed class VehiclesSteps
     private async System.Threading.Tasks.Task<HttpClient>
         CreateAdminClientAsync()
     {
+
+_customerServiceMock
+    .Setup(service => service.GetByIdAsync(1))
+    .ReturnsAsync(new Customer(
+        "WS-01",
+        "Cliente de Prueba",
+        "12345678",
+        "cliente@test.com",
+        "999999999"
+    ));
+
         var builder = WebApplication.CreateBuilder();
 
         builder.WebHost.UseTestServer();
