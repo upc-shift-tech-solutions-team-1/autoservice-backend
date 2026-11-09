@@ -1,3 +1,4 @@
+using AutoServiceAW.API.CustomerManagement.Domain.Model.Aggregates;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -35,6 +36,19 @@ public class VehiclesIntegrationTests
         var vehicleRepositoryMock = new Mock<IVehicleRepository>();
         var unitOfWorkMock = new Mock<IUnitOfWork>();
         var customerServiceMock = new Mock<ICustomerService>();
+
+var testCustomer = new Customer(
+    "WS-101",
+    "Cliente de Prueba",
+    "12345678",
+    "cliente@test.com",
+    "999999999"
+);
+
+customerServiceMock
+    .Setup(service => service.GetByIdAsync(1))
+    .ReturnsAsync(testCustomer);
+
 
         vehicleRepositoryMock
             .Setup(repository => repository.AddAsync(
@@ -147,6 +161,18 @@ public class VehiclesIntegrationTests
         var vehicleRepositoryMock = new Mock<IVehicleRepository>();
         var unitOfWorkMock = new Mock<IUnitOfWork>();
         var customerServiceMock = new Mock<ICustomerService>();
+
+var testCustomer = new Customer(
+    "WS-101",
+    "Cliente de Prueba",
+    "12345678",
+    "cliente@test.com",
+    "999999999"
+);
+
+customerServiceMock
+    .Setup(service => service.GetByIdAsync(1))
+    .ReturnsAsync(testCustomer);
 
         vehicleRepositoryMock
             .Setup(repository => repository.FindByIdAsync(
