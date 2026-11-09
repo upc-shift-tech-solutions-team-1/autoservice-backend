@@ -286,6 +286,44 @@ public class VehicleAcceptanceTests
 
         // ASSERT
         Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        // Verify that the remaining vehicle endpoints also
+        // reject authenticated users without a WorkshopId.
+
+        var vehicleRequest = new CreateVehicleResource(
+            "ABC-123",
+            "Toyota",
+            "Corolla",
+            "2024",
+            "Black",
+            "ACTIVE",
+            "",
+            1
+        );
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/v1/vehicles",
+            vehicleRequest
+        );
+
+        var getByIdResponse = await client.GetAsync(
+            "/api/v1/vehicles/1"
+        );
+
+        var updateResponse = await client.PutAsJsonAsync(
+            "/api/v1/vehicles/1",
+            vehicleRequest
+        );
+
+        var deleteResponse = await client.DeleteAsync(
+            "/api/v1/vehicles/1"
+        );
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, createResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, getByIdResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, updateResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, deleteResponse.StatusCode);
+
     }
 
     private static string GenerateJwtToken(string email, string role, string? workshopId)
