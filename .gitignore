@@ -13,15 +13,12 @@
 # IDE and local tool configurations
 .idea/
 .vs/
-.vscode/
 .ai/
 
 # Operating system files
 .DS_Store
 
 # Environment variables and secrets
-.env
-.env.*
 !.env.example
 
 # Local scripts and configurations
