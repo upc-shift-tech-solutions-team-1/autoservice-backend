@@ -214,6 +214,75 @@ public class VehicleAcceptanceTests
         Assert.AreEqual("ABC-123", fleetList[0].GetProperty("plate").GetString());
         Assert.AreEqual("IN_REPAIR", fleetList[0].GetProperty("status").GetString());
 
+
+        // SECURITY CHECK: another workshop must not access this vehicle.
+        var otherWorkshopToken = GenerateJwtToken(
+            "other-admin@autoservice.com",
+            "admin",
+            "WS-02"
+        );
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", otherWorkshopToken);
+
+        // Another workshop cannot create a vehicle for our customer.
+        var unauthorizedCreate = await client.PostAsJsonAsync(
+            "/api/v1/vehicles",
+            createResource,
+            TestContext.CancellationToken
+        );
+
+        Assert.AreEqual(
+            HttpStatusCode.NotFound,
+            unauthorizedCreate.StatusCode
+        );
+
+        // Another workshop cannot retrieve our vehicle.
+        var unauthorizedGet = await client.GetAsync(
+            $"/api/v1/vehicles/{createdVehicleId}",
+            TestContext.CancellationToken
+        );
+
+        Assert.AreEqual(
+            HttpStatusCode.NotFound,
+            unauthorizedGet.StatusCode
+        );
+
+        // Another workshop cannot update our vehicle.
+        var unauthorizedUpdate = await client.PutAsJsonAsync(
+            $"/api/v1/vehicles/{createdVehicleId}",
+            updateResource,
+            TestContext.CancellationToken
+        );
+
+        Assert.AreEqual(
+            HttpStatusCode.NotFound,
+            unauthorizedUpdate.StatusCode
+        );
+
+        // Another workshop cannot delete our vehicle.
+        var unauthorizedDelete = await client.DeleteAsync(
+            $"/api/v1/vehicles/{createdVehicleId}",
+            TestContext.CancellationToken
+        );
+
+        Assert.AreEqual(
+            HttpStatusCode.NotFound,
+            unauthorizedDelete.StatusCode
+        );
+
+        // The vehicle must remain unchanged after the rejected requests.
+        Assert.IsTrue(vehicleStore.ContainsKey(createdVehicleId));
+        Assert.AreEqual(
+            "IN_REPAIR",
+            vehicleStore[createdVehicleId].Status
+        );
+
+        // Restore the original workshop before continuing the lifecycle.
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+
         // ACT & ASSERT - STEP 5: DELETE VEHICLE THROUGH REST INTERFACE
         var deleteResponse = await client.DeleteAsync($"/api/v1/vehicles/{createdVehicleId}");
         Assert.AreEqual(HttpStatusCode.NoContent, deleteResponse.StatusCode);
